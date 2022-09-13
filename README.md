@@ -3,7 +3,7 @@ Application of SHAP and XAI approaches to Riemannian Geometry based EEG classifi
 
 1. Apply SHAP to Riemannian Geometry to determine how it uses EEG features in MI EEG classification
 2. Compare RG SHAP to DL SHAP and more traditional classifiers
-3. Look at steps 1 & 2 in the context of both Single-Subject Multi-Session (MS) and Multi-Subject Single-Session (TL for
-Transfer Learning) EEG data to investigate RG performance in greater detail
+3. Look at steps 1 & 2 in the context of both Single-Subject Multi-Session (SS) and Multi-Subject Single-Session (MS) 
+EEG data to investigate RG performance in greater detail
 
 All datasets used for this analysis are property of INRIA Bordeaux and not public.
