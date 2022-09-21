@@ -1,6 +1,129 @@
 import mne
 import os
 
+import pandas as pd
+from mne.decoding import CSP
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
+import numpy as np
+from pyriemann.classification import MDM
+from pyriemann.tangentspace import TangentSpace
+from pyriemann.estimation import Covariances
+
+from sklearn.pipeline import make_pipeline
+from sklearn.linear_model import LogisticRegression
+from numpy.random import seed
+seed(2002012)
+
+
+########################################
+# DEFINE FUNCTIONS FROM INRIA PIPELINE #
+########################################
+
+def preprocess(raw, steps={}):
+    """ preprocess the data"""
+    assert isinstance(steps, dict), "steps must be a dictionary"
+    raw.load_data()
+    if "drop_channels" in steps.keys():
+        # remove the wanted channels
+        for channel in steps["drop_channels"]:  # for each channel to be dropped...
+            if channel in raw.ch_names:  # ensure that it is actually a channel in the data
+                raw.drop_channels(channel)
+
+    if "filter" in steps.keys():
+        assert isinstance(steps["filter"], list), "filter parameters must be a list in the form [l_freq,h_freq]"
+        raw.filter(steps["filter"][0], steps["filter"][1])
+
+    return raw
+
+
+def epoching(dict, key_session=[], steps_preprocess=None, key_events={"769": 0, "770": 1}):
+    """From the dictionary of mne.rawGDF extract all the epochs selected with Key_session
+     Return the epochs list as X and the label as Y"""
+
+    #---------------------------------------------
+    tmin = steps_preprocess["tmin"]
+    tmax = steps_preprocess["tmax"]
+    length_epoch = steps_preprocess["length"]
+    overlap = steps_preprocess["overlap"]
+    #---------------------------------------------
+    X = None
+    Y = None
+
+    for key in key_session:
+        if steps_preprocess is not None:
+            _ = preprocess(dict[key], steps_preprocess)
+
+        epoch = mne.Epochs(dict[key], mne.events_from_annotations(dict[key], key_events)[0], tmin=-1, tmax=5,
+                           baseline=(None, 0),  verbose="CRITICAL")
+
+        list_start = np.arange(tmin, (tmax + overlap) - length_epoch, overlap)
+        list_stop = np.arange(tmin+length_epoch, (tmax+overlap), overlap)
+
+        for start, stop in zip(list_start, list_stop):
+            if X is None:
+                X = epoch.get_data(tmin=start, tmax=stop)
+                Y = epoch.events[:, 2]
+
+            else:
+                X = np.append(X, epoch.get_data(tmin=start, tmax=stop), axis=0)
+                Y = np.append(Y, epoch.events[:, 2], axis=0)
+
+    return X, Y
+
+
+def test_pipeline_within_session(pipelines, session, steps_preprocess=None):
+    """ Take in input the different pipelines to test and return the corresponding classification accuracy"""
+    accuracy = pd.DataFrame(np.zeros((len(session), len(pipelines))), index=session, columns=pipelines.keys())
+
+    for subject in session:
+        train_key = [subject+"_1", subject+"_2"]
+        if subject == "A59":  # Manage the error during the data acquisition
+            test_key = [subject+"_3", subject+"_4"]
+        else:  # Take all the session possible
+            test_key = [subject+"_3", subject+"_4", subject+"_5", subject+"_6"]
+
+        print(subject)
+        X_train, Y_train = epoching(dic_data_train, train_key, steps_preprocess)
+        X_test, Y_test = epoching(dic_data_test, test_key, steps_preprocess)
+
+        for classifier in pipelines.keys():
+                pipelines[classifier].fit(X_train, Y_train)
+
+                if steps_preprocess["score"] == "TAcc":
+
+                    #---------------------------------------------
+                    tmin= steps_preprocess["tmin"]
+                    tmax = steps_preprocess["tmax"]
+                    length_epoch = steps_preprocess["length"]
+                    overlap = steps_preprocess["overlap"]
+                    #---------------------------------------------
+                    dist = len(np.arange(tmin, (tmax + overlap) - length_epoch, overlap))
+
+                    X_estim = pipelines[classifier].transform(X_test)
+
+                    X_estim_reshape = X_estim.reshape((-1, dist))
+                    X_sum = X_estim_reshape.sum(axis=0)
+
+                    trial_predict = np.where(X_sum < 0, 0, 1)  # if the sum < 0, left. If >0, predict right
+                    temporary_accuracy = np.where(trial_predict == Y_test[0::dist-1], 1, 0)  # Compare predictions with observations
+
+                    accuracy[classifier][subject] = temporary_accuracy.mean()
+
+                elif steps_preprocess["score"] == "EAcc":
+                    try:
+                        accuracy[classifier][subject] = pipelines[classifier].score(X_test, Y_test)
+                    except:
+                        accuracy[classifier][subject] = np.nan
+                else:
+                    raise AttributeError("The chosen score does not exist!")
+
+    return accuracy
+
+
+#################
+# LOAD THE DATA #
+#################
+
 # Establish master data path
 path = os.path.join("Data", "MS")
 
@@ -49,3 +172,45 @@ for sub in subjects:  # for each subject...
 # data[subject][5] = Test session 2 (w/ feedback)
 # data[subject][6] = Test session 3 (w/ feedback)
 # data[subject][7] = Test session 4 (w/ feedback)
+
+
+##################################
+# FORMAT DATA FOR INRIA PIPELINE #
+##################################
+
+# Follow format used by INRIA pipeline, to speed up analysis
+# dic_data_format = participant number (+ _1 or _2 for train) (+ _3-6 for test) : mne raw object
+dic_data_train = {}
+dic_data_test = {}
+for i in data.keys():  # for every subject...
+    for j in range(1, 3):  # place their training sessions into one dictionary
+        session = str(i) + '_' + str(j)
+        dic_data_train[session] = data[i][j+1]  # following the indexes from the comment above
+    for j in range(3, 7):  # and their testing sessions into another dictionary
+        session = str(i) + '_' + str(j)
+        dic_data_test[session] = data[i][j+1]  # with the same indexing as the comment block above
+
+
+################################
+# SELECT OUR ANALYSIS PIPELINE #
+################################
+
+# dictionary for all our testing pipelines
+pipelines = {}
+pipelines['8csp+lda'] = make_pipeline(CSP(n_components=8), LDA())  # baseline comparison CSP+LDA
+pipelines['MDM'] = make_pipeline(Covariances(estimator='lwf'), MDM(metric='riemann', n_jobs=-1))  # simple Riemannian
+pipelines['tangentspace+svm'] = make_pipeline(Covariances(estimator='lwf'),
+                                      TangentSpace(metric='riemann'),
+                                      LogisticRegression())  # more realistic Riemannian
+
+
+#############################
+# RUN OUR ANALYSIS PIPELINE #
+#############################
+
+session = list(data.keys())  # a list of participants to be used for analysis
+steps_preprocess = {"filter": [8, 30],  # filter from 8-30Hz
+                    "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
+                    "tmin": 0.5, "tmax": 4, "overlap":1/16, "length": 1,
+                    "score": "EAcc"}
+accuracy = test_pipeline_within_session(pipelines, session, steps_preprocess)  # run pipeline!
