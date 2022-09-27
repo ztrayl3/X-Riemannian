@@ -1,6 +1,11 @@
 import mne
 import os
 
+
+#################
+# LOAD THE DATA #
+#################
+
 # Establish master data path
 path = os.path.join("Data", "SS")
 
@@ -69,3 +74,25 @@ for sub in subjects:  # for each subject...
 # data[subject][27] = Reading span task 8
 # data[subject][28] = Reading span task 9
 # data[subject][29] = Reading span task 10
+
+
+##################################
+# FORMAT DATA FOR INRIA PIPELINE #
+##################################
+
+# Follow format used by INRIA pipeline, to speed up analysis
+# dic_data_format = participant number (+ _1 or _2 for train) (+ _3-6 for test) : mne raw object
+dic_data_train = {}
+dic_data_test = {}
+for i in data.keys():  # for every subject...
+    for j in range(1, 3):  # place their training sessions into one dictionary
+        session = str(i) + '_' + str(j)
+        dic_data_train[session] = data[i][j+1]  # following the indexes from the comment above
+    for j in range(3, 7):  # and their testing sessions into another dictionary
+        session = str(i) + '_' + str(j)
+        dic_data_test[session] = data[i][j+1]  # with the same indexing as the comment block above
+
+# TODO:
+# -correct loading to separately load session 1-3, not overwrite it
+# -format for INRIA pipeline code
+# -add INRIA pipeline code (from load_MS)
