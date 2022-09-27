@@ -199,9 +199,9 @@ for i in data.keys():  # for every subject...
 pipelines = {}
 pipelines['8csp+lda'] = make_pipeline(CSP(n_components=8), LDA())  # baseline comparison CSP+LDA
 pipelines['MDM'] = make_pipeline(Covariances(estimator='lwf'), MDM(metric='riemann', n_jobs=-1))  # simple Riemannian
-pipelines['tangentspace+svm'] = make_pipeline(Covariances(estimator='lwf'),
-                                      TangentSpace(metric='riemann'),
-                                      LogisticRegression())  # more realistic Riemannian
+pipelines['tangentspace+LR'] = make_pipeline(Covariances(estimator='lwf'),
+                                             TangentSpace(metric='riemann'),
+                                             LogisticRegression())  # more realistic Riemannian
 
 
 #############################
@@ -211,6 +211,6 @@ pipelines['tangentspace+svm'] = make_pipeline(Covariances(estimator='lwf'),
 session = list(data.keys())  # a list of participants to be used for analysis
 steps_preprocess = {"filter": [8, 30],  # filter from 8-30Hz
                     "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
-                    "tmin": 0.5, "tmax": 4, "overlap":1/16, "length": 1,
+                    "tmin": 0.5, "tmax": 4, "overlap": 1/16, "length": 1,
                     "score": "EAcc"}
 accuracy = test_pipeline_within_session(pipelines, session, steps_preprocess)  # run pipeline!
