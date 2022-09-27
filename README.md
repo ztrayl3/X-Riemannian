@@ -7,3 +7,14 @@ Application of SHAP and XAI approaches to Riemannian Geometry based EEG classifi
 EEG data to investigate RG performance in greater detail
 
 All datasets used for this analysis are property of INRIA Bordeaux and not public.
+
+TODO:
+
+* ~~MS_RG_Within.py~~
+* MS_RG_Between.py
+* MS_DL_Within.py
+* ~~MS_DL_Between.py~~
+* SS_RG_Within.py
+* SS_RG_Between.py
+* SS_DL_Within.py
+* SS_DL_Between.py

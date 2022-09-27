@@ -16,17 +16,17 @@
  To use:
     
     (1) Place this file in the PYTHONPATH variable in your IDE (i.e.: Spyder)
-    (2) Import the model as
+    (2) Import the Model as
         
         from EEGModels import EEGNet    
         
-        model = EEGNet(nb_classes = ..., Chans = ..., Samples = ...)
+        Model = EEGNet(nb_classes = ..., Chans = ..., Samples = ...)
         
-    (3) Then compile and fit the model
+    (3) Then compile and fit the Model
     
-        model.compile(loss = ..., optimizer = ..., metrics = ...)
-        fitted    = model.fit(...)
-        predicted = model.predict(...)
+        Model.compile(loss = ..., optimizer = ..., metrics = ...)
+        fitted    = Model.fit(...)
+        predicted = Model.predict(...)
 
  Portions of this project are works of the United States Government and are not
  subject to domestic copyright protection under 17 USC Sec. 105.  Those 
@@ -82,15 +82,15 @@ def EEGNet(nb_classes, Chans = 64, Samples = 128,
     on the Oscillatory dataset (SMR, BCI-IV Dataset 2A). We recommend using
     the default Dropout in most cases.
         
-    Assumes the input signal is sampled at 128Hz. If you want to use this model
+    Assumes the input signal is sampled at 128Hz. If you want to use this Model
     for any other sampling rate you will need to modify the lengths of temporal
     kernels and average pooling size in blocks 1 and 2 as needed (double the 
     kernel lengths for double the sampling rate, etc). Note that we haven't 
-    tested the model performance with this rule so this may not work well. 
+    tested the Model performance with this rule so this may not work well.
     
-    The model with default parameters gives the EEGNet-8,2 model as discussed
-    in the paper. This model should do pretty well in general, although it is
-	advised to do some model searching to get optimal performance on your
+    The Model with default parameters gives the EEGNet-8,2 Model as discussed
+    in the paper. This Model should do pretty well in general, although it is
+	advised to do some Model searching to get optimal performance on your
 	particular dataset.
 
     We set F2 = F1 * D (number of input filters = number of output filters) for
@@ -225,7 +225,7 @@ def EEGNet_old(nb_classes, Chans = 64, Samples = 128, regRate = 0.0001,
            dropoutRate = 0.25, kernels = [(2, 32), (8, 4)], strides = (2, 4)):
     """ Keras Implementation of EEGNet_v1 (https://arxiv.org/abs/1611.08024v2)
 
-    This model is the original EEGNet model proposed on arxiv
+    This Model is the original EEGNet Model proposed on arxiv
             https://arxiv.org/abs/1611.08024v2
     
     with a few modifications: we use striding instead of max-pooling as this 
@@ -248,7 +248,7 @@ def EEGNet_old(nb_classes, Chans = 64, Samples = 128, regRate = 0.0001,
     
     """
 
-    # start the model
+    # start the Model
     input_main   = Input((Chans, Samples))
     layer1       = Conv2D(16, (Chans, 1), input_shape=(Chans, Samples, 1),
                                  kernel_regularizer = l1_l2(l1=regRate, l2=regRate))(input_main)
@@ -307,7 +307,7 @@ def DeepConvNet(nb_classes, Chans = 64, Samples = 256,
     
     """
 
-    # start the model
+    # start the Model
     input_main   = Input((Chans, Samples, 1))
     block1       = Conv2D(25, (1, 5), 
                                  input_shape=(Chans, Samples, 1),
@@ -381,7 +381,7 @@ def ShallowConvNet(nb_classes, Chans = 64, Samples = 128, dropoutRate = 0.5):
     original paper with minor deviations. 
     """
 
-    # start the model
+    # start the Model
     input_main   = Input((Chans, Samples, 1))
     block1       = Conv2D(40, (1, 13), 
                                  input_shape=(Chans, Samples, 1),

@@ -36,7 +36,7 @@ def preprocess(raw, steps={}):
     return raw
 
 
-def epoching(dict, key_session=[], steps_preprocess=None, key_events={"769": 0, "770": 1}):
+def epoching(dict, key_session=[], steps_preprocess=None, key_events={"769": 0, "770": 1}, DL=False):
     """From the dictionary of mne.rawGDF extract all the epochs selected with Key_session
      Return the epochs list as X and the label as Y"""
 
@@ -83,8 +83,8 @@ def test_pipeline_within_session(pipelines, session, steps_preprocess=None):
             test_key = [subject+"_3", subject+"_4", subject+"_5", subject+"_6"]
 
         print(subject)
-        X_train, Y_train = epoching(dic_data_train, train_key, steps_preprocess)
-        X_test, Y_test = epoching(dic_data_test, test_key, steps_preprocess)
+        X_train, Y_train = epoching(dic_data_train, train_key, steps_preprocess)  # X = epochs, Y = labels
+        X_test, Y_test = epoching(dic_data_test, test_key, steps_preprocess)  # same as above, but test set
 
         for classifier in pipelines.keys():
                 pipelines[classifier].fit(X_train, Y_train)
@@ -92,7 +92,7 @@ def test_pipeline_within_session(pipelines, session, steps_preprocess=None):
                 if steps_preprocess["score"] == "TAcc":
 
                     #---------------------------------------------
-                    tmin= steps_preprocess["tmin"]
+                    tmin = steps_preprocess["tmin"]
                     tmax = steps_preprocess["tmax"]
                     length_epoch = steps_preprocess["length"]
                     overlap = steps_preprocess["overlap"]
