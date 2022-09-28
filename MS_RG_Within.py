@@ -36,7 +36,7 @@ def preprocess(raw, steps={}):
     return raw
 
 
-def epoching(dict, key_session=[], steps_preprocess=None, key_events={"769": 0, "770": 1}, DL=False):
+def epoching(dict, key_session=[], steps_preprocess=None, key_events={"769": 0, "770": 1}):
     """From the dictionary of mne.rawGDF extract all the epochs selected with Key_session
      Return the epochs list as X and the label as Y"""
 
@@ -183,12 +183,12 @@ for sub in subjects:  # for each subject...
 dic_data_train = {}
 dic_data_test = {}
 for i in data.keys():  # for every subject...
-    for j in range(1, 3):  # place their training sessions into one dictionary
+    for j in range(1, 3):  # place their training sessions (2) into one dictionary
+        session = str(i) + '_' + str(j)  # their numbering will start from 1...
+        dic_data_train[session] = data[i][j+1]  # but indexing must follow the indexes from the comment above (hence +1)
+    for j in range(3, 7):  # and their testing sessions (4) into another dictionary
         session = str(i) + '_' + str(j)
-        dic_data_train[session] = data[i][j+1]  # following the indexes from the comment above
-    for j in range(3, 7):  # and their testing sessions into another dictionary
-        session = str(i) + '_' + str(j)
-        dic_data_test[session] = data[i][j+1]  # with the same indexing as the comment block above
+        dic_data_test[session] = data[i][j+1]
 
 
 ################################
