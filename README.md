@@ -6,7 +6,7 @@ Application of SHAP and XAI approaches to Riemannian Geometry based EEG classifi
 3. Look at steps 1 & 2 in the context of both Single-Subject Multi-Session (SS) and Multi-Subject Single-Session (MS) 
 EEG data to investigate RG performance in greater detail
 
-All datasets used for this analysis are property of INRIA Bordeaux and not public.
+All datasets used for this analysis are property of INRIA Bordeaux and not yet public (as of Fall 2022).
 
 TODO:
 
@@ -14,7 +14,7 @@ TODO:
 * MS_RG_Between.py
 * MS_DL_Within.py
 * ~~MS_DL_Between.py~~
-* SS_RG_Within.py
+* ~~SS_RG_Within.py~~
 * SS_RG_Between.py
 * SS_DL_Within.py
 * SS_DL_Between.py
