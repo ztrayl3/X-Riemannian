@@ -1,5 +1,6 @@
 import mne
 import os
+
 import pandas as pd
 from mne.decoding import CSP
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
@@ -75,15 +76,12 @@ def test_pipeline_within_session(pipelines, session, steps_preprocess=None):
     accuracy = pd.DataFrame(np.zeros((len(session), len(pipelines))), index=session, columns=pipelines.keys())
 
     for subject in session:
-        train_key = [subject+"_1", subject+"_2"]
-        if subject == "A59":  # Manage the error during the data acquisition
-            test_key = [subject+"_3", subject+"_4"]
-        else:  # Take all the session possible
-            test_key = [subject+"_3", subject+"_4", subject+"_5", subject+"_6"]
+        train_key = {k: v for k, v in dic_data.items() if subject not in k}  # train on all subject's data EXCEPT one
+        test_key = {k: v for k, v in dic_data.items() if subject in k}  # test on that subject
 
         print(subject)
-        X_train, Y_train = epoching(dic_data_train, train_key, steps_preprocess)  # X = epochs, Y = labels
-        X_test, Y_test = epoching(dic_data_test, test_key, steps_preprocess)  # same as above, but test set
+        X_train, Y_train = epoching(dic_data, train_key, steps_preprocess)  # X = epochs, Y = labels
+        X_test, Y_test = epoching(dic_data, test_key, steps_preprocess)  # same as above, but test set
 
         for classifier in pipelines.keys():
                 pipelines[classifier].fit(X_train, Y_train)
@@ -179,15 +177,11 @@ for sub in subjects:  # for each subject...
 
 # Follow format used by INRIA pipeline, to speed up analysis
 # dic_data_format = participant number (+ _1 or _2 for train) (+ _3-6 for test) : mne raw object
-dic_data_train = {}
-dic_data_test = {}
-for i in data.keys():  # for every subject...
-    for j in range(1, 3):  # place their training sessions (2) into one dictionary
+dic_data = {}
+for i in data.keys():  # for every subject_session...
+    for j in range(1, 7):  # load ALL their data
         session = str(i) + '_' + str(j)  # their numbering will start from 1...
-        dic_data_train[session] = data[i][j+1]  # but indexing must follow the indexes from the comment above (hence +1)
-    for j in range(3, 7):  # and their testing sessions (4) into another dictionary
-        session = str(i) + '_' + str(j)
-        dic_data_test[session] = data[i][j+1]
+        dic_data[session] = data[i][j + 1]  # but indexing must follow the indexes from the comment above (hence +1)
 
 
 ################################

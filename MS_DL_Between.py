@@ -177,8 +177,8 @@ for sub in subjects:  # for each subject...
 dic_data = {}
 for i in data.keys():  # for every subject...
     for j in range(1, 7):
-        session = str(i) + '_' + str(j)
-        dic_data[session] = data[i][j + 1]  # place their sessions into one dictionary following the indexes above
+        session = str(i) + '_' + str(j)  # their numbering will start from 1...
+        dic_data[session] = data[i][j + 1]  # but indexing must follow the indexes from the comment above (hence +1)
 
 
 #########################
