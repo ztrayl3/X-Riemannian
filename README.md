@@ -13,8 +13,8 @@ TODO:
 * ~~MS_RG_Within~~
 * ~~MS_RG_Between~~
 * MS_DL_Within
-* ~~MS_DL_Between~~
-* ~~SS_RG_Within~~
+* ~~MS_DL_Between~~ (Test results indicate difference between function/script)
+* ~~SS_RG_Within~~ (Not properly labeling before epoching, e.g.: _1 doesn't match _5)
 * SS_RG_Between
 * SS_DL_Within
 * SS_DL_Between

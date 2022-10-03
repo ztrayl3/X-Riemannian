@@ -39,55 +39,60 @@ pipelines['tangentspace+LR'] = make_pipeline(Covariances(estimator='lwf'),
 # Condition  : Between Subject Performance (leave-one-out)  #
 #############################################################
 
-data, dic_data = load_MS(between=True)  # load multi-subject dataset for between subject analysis
-n_chans = data[list(data)[0]][0].get_channel_types().count("eeg")  # load the first file, count how many eeg channels
 
-steps_preprocess = {"filter": [8, 30],  # filter from 8-30Hz
-                    "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
-                    "tmin": 0.5, "tmax": 2.5, "overlap": 1, "length": 2}
+def MS_DL_Between():
+    data, dic_data = load_MS(between=True)  # load multi-subject dataset for between subject analysis
+    n_chans = data[list(data)[0]][0].get_channel_types().count("eeg")  # load the first file, count how many eeg channels
 
-my_callbacks = [
-    EarlyStopping(patience=50, monitor="loss"),
-    ModelCheckpoint(filepath='Model/best_model.h5', save_best_only=True)
-]
+    steps_preprocess = {"filter": [8, 30],  # filter from 8-30Hz
+                        "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
+                        "tmin": 0.5, "tmax": 2.5, "overlap": 1, "length": 2}
 
-performance = {}
-subjects = list(data.keys())  # a list of participants to be used for analysis
+    my_callbacks = [
+        EarlyStopping(patience=50, monitor="loss"),
+        ModelCheckpoint(filepath='Model/best_model.h5', save_best_only=True)
+    ]
 
-for subject in (range(len(subjects))):  # for each subject
+    performance = {}
+    subjects = list(data.keys())  # a list of participants to be used for analysis
 
-    train_id = subjects.copy()  # train on all
-    test_id = train_id.pop(subject)  # except for one (leave one out)
+    for subject in (range(len(subjects))):  # for each subject
 
-    key_train_valid = create_key(train_id, train=1, test=1)
-    key_test = create_key([test_id], train=0, test=1)
+        train_id = subjects.copy()  # train on all
+        test_id = train_id.pop(subject)  # except for one (leave one out)
 
-    mask = np.array([True, True, True, True, False, False] * int(key_train_valid.shape[0]/6))
-    np.random.shuffle(mask)
-    key_train = key_train_valid[mask]
-    key_valid = key_train_valid[~mask]
+        key_train_valid = create_key(train_id, train=1, test=1)
+        key_test = create_key([test_id], train=0, test=1)
 
-    X_train, Y_train = epoching(dic_data, key_train, steps_preprocess, DL=True)
-    X_valid, Y_valid = epoching(dic_data, key_valid, steps_preprocess, DL=True)
-    X_test, Y_test = epoching(dic_data, key_test, steps_preprocess, DL=True)
+        mask = np.array([True, True, True, True, False, False] * int(key_train_valid.shape[0]/6))
+        np.random.shuffle(mask)
+        key_train = key_train_valid[mask]
+        key_valid = key_train_valid[~mask]
 
-    train_gen = DataGenerator(X_train, Y_train, 64)
-    valid_gen = DataGenerator(X_valid, Y_valid, 64)
-    test_gen = DataGenerator(X_test, Y_test, 64)
+        X_train, Y_train = epoching(dic_data, key_train, steps_preprocess, DL=True)
+        X_valid, Y_valid = epoching(dic_data, key_valid, steps_preprocess, DL=True)
+        X_test, Y_test = epoching(dic_data, key_test, steps_preprocess, DL=True)
 
-    model = ShallowConvNet(nb_classes=n_classes, Chans=n_chans, Samples=input_window_samples)
-    model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=BinaryAccuracy())
+        train_gen = DataGenerator(X_train, Y_train, 64)
+        valid_gen = DataGenerator(X_valid, Y_valid, 64)
+        test_gen = DataGenerator(X_test, Y_test, 64)
 
-    fit_model = model.fit(x=train_gen,
-                          batch_size=batch_size,
-                          epochs=n_epochs,
-                          callbacks=my_callbacks,
-                          validation_data=valid_gen,
-                          verbose=1)
+        model = ShallowConvNet(nb_classes=n_classes, Chans=n_chans, Samples=input_window_samples)
+        model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=BinaryAccuracy())
 
-    model = load_model("Model/best_model.h5", custom_objects={"square": square, "log": log})
+        fit_model = model.fit(x=train_gen,
+                              batch_size=batch_size,
+                              epochs=n_epochs,
+                              callbacks=my_callbacks,
+                              validation_data=valid_gen,
+                              verbose=1)
 
-    performance[subject] = model.evaluate(x=test_gen)[1]  # format: performance[subject] = accuracy if subject left out
+        model = load_model("Model/best_model.h5", custom_objects={"square": square, "log": log})
+
+        performance[subject] = model.evaluate(x=test_gen)[1]
+        # format: performance[subject] = accuracy if subject left out
+
+    return performance
 
 
 #############################################################
@@ -105,16 +110,20 @@ for subject in (range(len(subjects))):  # for each subject
 # Condition  : Between Subject Performance (leave-one out)  #
 #############################################################
 
-# load the MS dataset
-data, dic_data = load_MS(between=True)
 
-# run the selected pipelines
-session = list(data.keys())  # a list of participants to be used for analysis
-steps_preprocess = {"filter": [8, 30],  # filter from 8-30Hz
-                    "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
-                    "tmin": 0.5, "tmax": 4, "overlap": 1/16, "length": 1,
-                    "score": "EAcc"}
-accuracy = test_pipeline_between(dic_data, pipelines, session, steps_preprocess)  # run it!
+def MS_RG_Between():
+    # load the MS dataset
+    data, dic_data = load_MS(between=True)
+
+    # run the selected pipelines
+    session = list(data.keys())  # a list of participants to be used for analysis
+    steps_preprocess = {"filter": [8, 30],  # filter from 8-30Hz
+                        "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
+                        "tmin": 0.5, "tmax": 4, "overlap": 1/16, "length": 1,
+                        "score": "EAcc"}
+    accuracy = test_pipeline_between(dic_data, pipelines, session, steps_preprocess)  # run it!
+
+    return accuracy
 
 
 #############################################################
@@ -124,16 +133,20 @@ accuracy = test_pipeline_between(dic_data, pipelines, session, steps_preprocess)
 # Condition  : Within Subject Performance (train/test set)  #
 #############################################################
 
-# load the MS dataset
-data, dic_data_train, dic_data_test = load_MS(within=True)
 
-# run the selected pipelines
-session = list(data.keys())  # a list of participants to be used for analysis
-steps_preprocess = {"filter": [8, 30],  # filter from 8-30Hz
-                    "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
-                    "tmin": 0.5, "tmax": 4, "overlap": 1/16, "length": 1,
-                    "score": "EAcc"}
-accuracy = test_pipeline_within(dic_data_train, dic_data_test, pipelines, session, steps_preprocess)  # run it!
+def MS_RG_Within():
+    # load the MS dataset
+    data, dic_data_train, dic_data_test = load_MS(within=True)
+
+    # run the selected pipelines
+    session = list(data.keys())  # a list of participants to be used for analysis
+    steps_preprocess = {"filter": [8, 30],  # filter from 8-30Hz
+                        "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
+                        "tmin": 0.5, "tmax": 4, "overlap": 1/16, "length": 1,
+                        "score": "EAcc"}
+    accuracy = test_pipeline_within(dic_data_train, dic_data_test, pipelines, session, steps_preprocess)  # run it!
+
+    return accuracy
 
 
 ########################################################################################################################
@@ -170,13 +183,18 @@ accuracy = test_pipeline_within(dic_data_train, dic_data_test, pipelines, sessio
 # Condition  : Within Session Performance (train/test set)  #
 #############################################################
 
-# load the SS dataset
-data, dic_data_train, dic_data_test = load_SS(within=True)
 
-# run the selected pipelines
-session = list(data.keys())  # a list of participants to be used for analysis
-steps_preprocess = {"filter": [8, 30],  # filter from 8-30Hz
-                    "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
-                    "tmin": 0.5, "tmax": 4, "overlap": 1/16, "length": 1,
-                    "score": "EAcc"}
-accuracy = test_pipeline_within(dic_data_train, dic_data_test, pipelines, session, steps_preprocess)  # run it!
+def SS_RG_Within():
+    # load the SS dataset
+    data, dic_data_train, dic_data_test = load_SS(within=True)
+    print(data.keys())
+
+    # run the selected pipelines
+    session = list(data.keys())  # a list of participants to be used for analysis
+    steps_preprocess = {"filter": [8, 30],  # filter from 8-30Hz
+                        "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
+                        "tmin": 0.5, "tmax": 4, "overlap": 1/16, "length": 1,
+                        "score": "EAcc"}
+    accuracy = test_pipeline_within(dic_data_train, dic_data_test, pipelines, session, steps_preprocess)  # run it!
+
+    return accuracy

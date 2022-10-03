@@ -44,7 +44,8 @@ def preprocess(raw, steps={}):
     return raw
 
 
-def epoching(dict, key_session=[], steps_preprocess=None, key_events={"769":0 ,"770":1}, DL=False):
+def epoching(dict, key_session=[], steps_preprocess=None, key_events={"769":0, "770": 1}, DL=False):
+    print(dict)
     if DL:  # if we are epoching for the Deep Learning classifier...
         """From the dictionary of mne.rawGDF extract all the epochs selected with Key_session
          Return the epochs list as X and tje label as Y"""
