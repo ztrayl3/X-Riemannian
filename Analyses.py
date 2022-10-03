@@ -1,5 +1,5 @@
 import numpy as np
-from INRIA import create_key, epoching, preprocess, DataGenerator, load_MS, test_pipeline_within_session
+from INRIA import create_key, epoching, DataGenerator, load_MS, load_SS, test_pipeline_within, test_pipeline_between
 from EEGModels import ShallowConvNet, square, log
 from tensorflow.keras.metrics import BinaryAccuracy
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard
@@ -24,6 +24,13 @@ cuda = torch.cuda.is_available()
 n_classes = 2
 batch_size = 32
 
+# dictionary for all our testing pipelines
+pipelines = {}
+pipelines['8csp+lda'] = make_pipeline(CSP(n_components=8), LDA())  # baseline comparison CSP+LDA
+pipelines['MDM'] = make_pipeline(Covariances(estimator='lwf'), MDM(metric='riemann', n_jobs=-1))  # simple Riemannian
+pipelines['tangentspace+LR'] = make_pipeline(Covariances(estimator='lwf'),
+                                             TangentSpace(metric='riemann'),
+                                             LogisticRegression())  # more realistic Riemannian
 
 #############################################################
 # Analysis   : MS_DL_Between                                #
@@ -98,6 +105,17 @@ for subject in (range(len(subjects))):  # for each subject
 # Condition  : Between Subject Performance (leave-one out)  #
 #############################################################
 
+# load the MS dataset
+data, dic_data = load_MS(between=True)
+
+# run the selected pipelines
+session = list(data.keys())  # a list of participants to be used for analysis
+steps_preprocess = {"filter": [8, 30],  # filter from 8-30Hz
+                    "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
+                    "tmin": 0.5, "tmax": 4, "overlap": 1/16, "length": 1,
+                    "score": "EAcc"}
+accuracy = test_pipeline_between(dic_data, pipelines, session, steps_preprocess)  # run it!
+
 
 #############################################################
 # Analysis   : MS_RG_Within                                 #
@@ -109,21 +127,13 @@ for subject in (range(len(subjects))):  # for each subject
 # load the MS dataset
 data, dic_data_train, dic_data_test = load_MS(within=True)
 
-# dictionary for all our testing pipelines
-pipelines = {}
-pipelines['8csp+lda'] = make_pipeline(CSP(n_components=8), LDA())  # baseline comparison CSP+LDA
-pipelines['MDM'] = make_pipeline(Covariances(estimator='lwf'), MDM(metric='riemann', n_jobs=-1))  # simple Riemannian
-pipelines['tangentspace+LR'] = make_pipeline(Covariances(estimator='lwf'),
-                                             TangentSpace(metric='riemann'),
-                                             LogisticRegression())  # more realistic Riemannian
-
 # run the selected pipelines
 session = list(data.keys())  # a list of participants to be used for analysis
 steps_preprocess = {"filter": [8, 30],  # filter from 8-30Hz
                     "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
                     "tmin": 0.5, "tmax": 4, "overlap": 1/16, "length": 1,
                     "score": "EAcc"}
-accuracy = test_pipeline_within_session(dic_data_train, dic_data_test, pipelines, session, steps_preprocess)  # run it!
+accuracy = test_pipeline_within(dic_data_train, dic_data_test, pipelines, session, steps_preprocess)  # run it!
 
 
 ########################################################################################################################
@@ -135,6 +145,7 @@ accuracy = test_pipeline_within_session(dic_data_train, dic_data_test, pipelines
 # Classifier : ShallowConvNet                               #
 # Condition  : Between Session Performance (leave-one-out)  #
 #############################################################
+
 
 #############################################################
 # Analysis   : SS_DL_Within                                 #
@@ -159,3 +170,13 @@ accuracy = test_pipeline_within_session(dic_data_train, dic_data_test, pipelines
 # Condition  : Within Session Performance (train/test set)  #
 #############################################################
 
+# load the SS dataset
+data, dic_data_train, dic_data_test = load_SS(within=True)
+
+# run the selected pipelines
+session = list(data.keys())  # a list of participants to be used for analysis
+steps_preprocess = {"filter": [8, 30],  # filter from 8-30Hz
+                    "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
+                    "tmin": 0.5, "tmax": 4, "overlap": 1/16, "length": 1,
+                    "score": "EAcc"}
+accuracy = test_pipeline_within(dic_data_train, dic_data_test, pipelines, session, steps_preprocess)  # run it!
