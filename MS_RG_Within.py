@@ -1,6 +1,5 @@
 import mne
 import os
-
 import pandas as pd
 from mne.decoding import CSP
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA

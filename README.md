@@ -10,11 +10,11 @@ All datasets used for this analysis are property of INRIA Bordeaux and not yet p
 
 TODO:
 
-* ~~MS_RG_Within.py~~
-* ~~MS_RG_Between.py~~
-* MS_DL_Within.py
-* ~~MS_DL_Between.py~~
-* ~~SS_RG_Within.py~~
-* SS_RG_Between.py
-* SS_DL_Within.py
-* SS_DL_Between.py
+* ~~MS_RG_Within~~
+* ~~MS_RG_Between~~
+* MS_DL_Within
+* ~~MS_DL_Between~~
+* ~~SS_RG_Within~~
+* SS_RG_Between
+* SS_DL_Within
+* SS_DL_Between
