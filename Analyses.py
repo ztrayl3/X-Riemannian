@@ -1,11 +1,10 @@
 import numpy as np
-from INRIA import create_key, epoching, DataGenerator, load_MS, load_SS, test_pipeline_within, test_pipeline_between
+from INRIA import create_key, epoching, DataGenerator, load_MS, load_SS, test_pipeline
 from EEGModels import ShallowConvNet, square, log
 from tensorflow.keras.metrics import BinaryAccuracy
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard
 from keras.models import load_model
 import torch
-import pandas as pd
 from mne.decoding import CSP
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
 from pyriemann.classification import MDM
@@ -26,11 +25,14 @@ batch_size = 32
 
 # dictionary for all our testing pipelines
 pipelines = {}
-pipelines['8csp+lda'] = make_pipeline(CSP(n_components=8), LDA())  # baseline comparison CSP+LDA
+# pipelines['8csp+lda'] = make_pipeline(CSP(n_components=8), LDA())  # baseline comparison CSP+LDA
 pipelines['MDM'] = make_pipeline(Covariances(estimator='lwf'), MDM(metric='riemann', n_jobs=-1))  # simple Riemannian
 pipelines['tangentspace+LR'] = make_pipeline(Covariances(estimator='lwf'),
                                              TangentSpace(metric='riemann'),
                                              LogisticRegression())  # more realistic Riemannian
+
+# session IDs for the single subject dataset
+sessions = ["S1", "S2", "S3"]
 
 #############################################################
 # Analysis   : MS_DL_Between                                #
@@ -121,7 +123,8 @@ def MS_RG_Between():
                         "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
                         "tmin": 0.5, "tmax": 4, "overlap": 1/16, "length": 1,
                         "score": "EAcc"}
-    accuracy = test_pipeline_between(dic_data, pipelines, session, steps_preprocess)  # run it!
+    accuracy = test_pipeline(dic_data, pipelines, session, steps_preprocess,
+                             between=True, MS=True)  # run it!
 
     return accuracy
 
@@ -144,7 +147,8 @@ def MS_RG_Within():
                         "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
                         "tmin": 0.5, "tmax": 4, "overlap": 1/16, "length": 1,
                         "score": "EAcc"}
-    accuracy = test_pipeline_within(dic_data_train, dic_data_test, pipelines, session, steps_preprocess)  # run it!
+    accuracy = test_pipeline(dic_data_test, pipelines, session, steps_preprocess, dic_data_train,
+                             within=True, MS=True)
 
     return accuracy
 
@@ -176,6 +180,25 @@ def MS_RG_Within():
 #############################################################
 
 
+def SS_RG_Between():
+    # load the SS dataset
+    data, dic_data = load_SS(between=True)
+    subjects = list(data.keys())  # a list of participants to be used for analysis
+    target = []
+    for sub in subjects:
+        for sess in sessions:
+            target.append(sub + "_" + sess)  # create a joint list of subject-session IDs to fit the pipeline format
+
+    steps_preprocess = {"filter": [8, 30],  # filter from 8-30Hz
+                        "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
+                        "tmin": 0.5, "tmax": 4, "overlap": 1 / 16, "length": 1,
+                        "score": "EAcc"}
+    accuracy = test_pipeline(dic_data, pipelines, target, steps_preprocess,
+                             between=True, SS=True)
+
+    return accuracy
+
+
 #############################################################
 # Analysis   : SS_RG_Within                                 #
 # Dataset    : Single Subject, Multi Session                #
@@ -187,14 +210,17 @@ def MS_RG_Within():
 def SS_RG_Within():
     # load the SS dataset
     data, dic_data_train, dic_data_test = load_SS(within=True)
-    print(data.keys())
+    subjects = list(data.keys())  # a list of participants to be used for analysis
+    target = []
+    for sub in subjects:
+        for sess in sessions:
+            target.append(sub + "_" + sess)   # create a joint list of subject-session IDs to fit the pipeline format
 
-    # run the selected pipelines
-    session = list(data.keys())  # a list of participants to be used for analysis
     steps_preprocess = {"filter": [8, 30],  # filter from 8-30Hz
                         "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
-                        "tmin": 0.5, "tmax": 4, "overlap": 1/16, "length": 1,
+                        "tmin": 0.5, "tmax": 4, "overlap": 1 / 16, "length": 1,
                         "score": "EAcc"}
-    accuracy = test_pipeline_within(dic_data_train, dic_data_test, pipelines, session, steps_preprocess)  # run it!
+    accuracy = test_pipeline(dic_data_test, pipelines, target, steps_preprocess, dic_data_train,
+                             within=True, SS=True)
 
     return accuracy

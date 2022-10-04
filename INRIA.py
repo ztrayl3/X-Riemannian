@@ -45,7 +45,6 @@ def preprocess(raw, steps={}):
 
 
 def epoching(dict, key_session=[], steps_preprocess=None, key_events={"769":0, "770": 1}, DL=False):
-    print(dict)
     if DL:  # if we are epoching for the Deep Learning classifier...
         """From the dictionary of mne.rawGDF extract all the epochs selected with Key_session
          Return the epochs list as X and tje label as Y"""
@@ -138,97 +137,81 @@ class DataGenerator(Sequence):
         return batch_x, batch_y
 
 
-def test_pipeline_within(train, test, pipelines, session, steps_preprocess=None):
+def test_pipeline(test, pipelines, session, steps_preprocess, train=None,
+                  between=False, within=False, MS=False, SS=False):
     """ Take in input the different pipelines to test and return the corresponding classification accuracy"""
     accuracy = pd.DataFrame(np.zeros((len(session), len(pipelines))), index=session, columns=pipelines.keys())
 
-    for subject in session:
-        train_key = [subject+"_1", subject+"_2"]
-        if subject == "A59":  # Manage the error during the data acquisition of A59
-            test_key = [subject+"_3", subject+"_4"]
-        else:  # Take all the session possible
-            test_key = [subject+"_3", subject+"_4", subject+"_5", subject+"_6"]
+    for subject in session:  # this will be something like "A10" for MS and "S06_S1" for SS
+        if between:  # between subject/session analysis: no train set, just leave-one-out
+            if MS:  # using the multi subject dataset
+                train_key = {k: v for k, v in test.items() if subject not in k}  # train on all subjects data EXCEPT one
+                test_key = {k: v for k, v in test.items() if subject in k}  # test on that subject
 
-        print(subject)
-        X_train, Y_train = epoching(train, train_key, steps_preprocess)  # X = epochs, Y = labels
-        X_test, Y_test = epoching(test, test_key, steps_preprocess)  # same as above, but test set
+                X_train, Y_train = epoching(test, train_key, steps_preprocess)  # X = epochs, Y = labels
+                X_test, Y_test = epoching(test, test_key, steps_preprocess)  # same as above, but test set
 
-        for classifier in pipelines.keys():
-                pipelines[classifier].fit(X_train, Y_train)
+            if SS:  # using the single subject dataset
+                # group by subject, since we're focused on between-session not subject here
+                # We will take the "subject" (in this case S0#_S#) and treat that as our leave-out session
+                subID = subject[:3]  # grab the subject ID
+                subset = {k: v for k, v in test.items() if subID in k}  # subset to just the subject of interest
+                train_key = {k: v for k, v in subset.items() if subject not in k}  # train w/all sessions EXCEPT one (2)
+                test_key = {k: v for k, v in subset.items() if subject in k}  # test on that session (1)
 
-                if steps_preprocess["score"] == "TAcc":
+                X_train, Y_train = epoching(subset, train_key, steps_preprocess)  # X = epochs, Y = labels
+                X_test, Y_test = epoching(subset, test_key, steps_preprocess)  # same as above, but test set
 
-                    #---------------------------------------------
-                    tmin = steps_preprocess["tmin"]
-                    tmax = steps_preprocess["tmax"]
-                    length_epoch = steps_preprocess["length"]
-                    overlap = steps_preprocess["overlap"]
-                    #---------------------------------------------
-                    dist = len(np.arange(tmin, (tmax + overlap) - length_epoch, overlap))
+        if within:  # within subject/session analysis: utilize the built-in train/test sets
+            if MS:  # using the multi subject dataset
+                train_key = [subject + "_1", subject + "_2"]
+                if subject == "A59":  # Manage the error during the data acquisition of A59
+                    test_key = [subject + "_3", subject + "_4"]
+                else:  # Take all the session possible
+                    test_key = [subject + "_3", subject + "_4", subject + "_5", subject + "_6"]
 
-                    X_estim = pipelines[classifier].transform(X_test)
+                X_train, Y_train = epoching(train, train_key, steps_preprocess)  # X = epochs, Y = labels
+                X_test, Y_test = epoching(test, test_key, steps_preprocess)  # same as above, but test set
 
-                    X_estim_reshape = X_estim.reshape((-1, dist))
-                    X_sum = X_estim_reshape.sum(axis=0)
+            if SS:  # using the single subject dataset
+                train_key = [subject + "_1", subject + "_2", subject + "_3", subject + "_4"]
+                test_key = [subject + "_5", subject + "_6", subject + "_7", subject + "_8",
+                            subject + "_9", subject + "_10", subject + "_11", subject + "_12"]
 
-                    trial_predict = np.where(X_sum < 0, 0, 1)  # if the sum < 0, left. If >0, predict right
-                    temporary_accuracy = np.where(trial_predict == Y_test[0::dist-1], 1, 0)  # Compare predictions with observations
-
-                    accuracy[classifier][subject] = temporary_accuracy.mean()
-
-                elif steps_preprocess["score"] == "EAcc":
-                    try:
-                        accuracy[classifier][subject] = pipelines[classifier].score(X_test, Y_test)
-                    except:
-                        accuracy[classifier][subject] = np.nan
-                else:
-                    raise AttributeError("The chosen score does not exist!")
-
-    return accuracy
-
-
-def test_pipeline_between(all, pipelines, session, steps_preprocess=None):
-    """ Take in input the different pipelines to test and return the corresponding classification accuracy"""
-    accuracy = pd.DataFrame(np.zeros((len(session), len(pipelines))), index=session, columns=pipelines.keys())
-
-    for subject in session:
-        train_key = {k: v for k, v in all.items() if subject not in k}  # train on all subject's data EXCEPT one
-        test_key = {k: v for k, v in all.items() if subject in k}  # test on that subject
-
-        print(subject)
-        X_train, Y_train = epoching(all, train_key, steps_preprocess)  # X = epochs, Y = labels
-        X_test, Y_test = epoching(all, test_key, steps_preprocess)  # same as above, but test set
+                X_train, Y_train = epoching(train, train_key, steps_preprocess)  # X = epochs, Y = labels
+                X_test, Y_test = epoching(test, test_key, steps_preprocess)  # same as above, but test set
 
         for classifier in pipelines.keys():
-                pipelines[classifier].fit(X_train, Y_train)
+            pipelines[classifier].fit(X_train, Y_train)
 
-                if steps_preprocess["score"] == "TAcc":
+            if steps_preprocess["score"] == "TAcc":
 
-                    #---------------------------------------------
-                    tmin = steps_preprocess["tmin"]
-                    tmax = steps_preprocess["tmax"]
-                    length_epoch = steps_preprocess["length"]
-                    overlap = steps_preprocess["overlap"]
-                    #---------------------------------------------
-                    dist = len(np.arange(tmin, (tmax + overlap) - length_epoch, overlap))
+                # ---------------------------------------------
+                tmin = steps_preprocess["tmin"]
+                tmax = steps_preprocess["tmax"]
+                length_epoch = steps_preprocess["length"]
+                overlap = steps_preprocess["overlap"]
+                # ---------------------------------------------
+                dist = len(np.arange(tmin, (tmax + overlap) - length_epoch, overlap))
 
-                    X_estim = pipelines[classifier].transform(X_test)
+                X_estim = pipelines[classifier].transform(X_test)
 
-                    X_estim_reshape = X_estim.reshape((-1, dist))
-                    X_sum = X_estim_reshape.sum(axis=0)
+                X_estim_reshape = X_estim.reshape((-1, dist))
+                X_sum = X_estim_reshape.sum(axis=0)
 
-                    trial_predict = np.where(X_sum < 0, 0, 1)  # if the sum < 0, left. If >0, predict right
-                    temporary_accuracy = np.where(trial_predict == Y_test[0::dist-1], 1, 0)  # Compare predictions with observations
+                trial_predict = np.where(X_sum < 0, 0, 1)  # if the sum < 0, left. If >0, predict right
+                temporary_accuracy = np.where(trial_predict == Y_test[0::dist - 1], 1,
+                                              0)  # Compare predictions with observations
 
-                    accuracy[classifier][subject] = temporary_accuracy.mean()
+                accuracy[classifier][subject] = temporary_accuracy.mean()
 
-                elif steps_preprocess["score"] == "EAcc":
-                    try:
-                        accuracy[classifier][subject] = pipelines[classifier].score(X_test, Y_test)
-                    except:
-                        accuracy[classifier][subject] = np.nan
-                else:
-                    raise AttributeError("The chosen score does not exist!")
+            elif steps_preprocess["score"] == "EAcc":
+                try:
+                    accuracy[classifier][subject] = pipelines[classifier].score(X_test, Y_test)
+                except:
+                    accuracy[classifier][subject] = np.nan
+            else:
+                raise AttributeError("The chosen score does not exist!")
 
     return accuracy
 
@@ -325,13 +308,9 @@ def load_SS(between=False, within=False):
     subjects = next(os.walk(path))[
         1]  # Note: list of subjects is dynamically assigned here since they are non-consecutive
 
-    """
-    IMPORTANT! To conform with INRIA pipeline but use multi-session data, each session is appended as a new "subject"
-    This means that data takes the following format: data[sub_sess], ex: data["S01_S1"] for Subject 1 Session 1
-    """
-
     data = {}  # dictionary to hold all our data
     for sub in subjects:  # for each subject...
+        data[sub] = [[] for i in range(len(sessions))]  # within subject, create a list for each session
         for sess in range(
                 len(sessions)):  # for each session... (used as an iterator due to sessions/session_folder issue)
             fnames = [sub + "_" + sessions[sess] + "_" + i + ".gdf" for i in
@@ -352,58 +331,59 @@ def load_SS(between=False, within=False):
                     else:  # mark the rest as regular EEG
                         new_types.append("eeg")
                 i.set_channel_types(dict(zip(i.ch_names, new_types)))  # apply new channel types to raw object
-            name = sub + '_' + sessions[sess]  # make a new name so that each session is viewed as its own subject
-            data[name] = sub_data  # save sub_data list into data dictionary
+            data[sub][sess] = sub_data  # save sub_data list into data dictionary
 
-    # Current data format: data[subject] holds all 30 raw objects
-    # data[subject_session][0] = Closed eyes baseline
-    # data[subject_session][1] = Open eyes baseline
-    # data[subject_session][2] = Nback task 1
-    # data[subject_session][3] = Nback task 2
-    # data[subject_session][4] = Nback task 3
-    # data[subject_session][5] = Nback task 4
-    # data[subject_session][6] = Nback task 5
-    # data[subject_session][7] = Nback task 6
-    # data[subject_session][8] = Training session 1
-    # data[subject_session][9] = Training session 2
-    # data[subject_session][10] = Training session 3
-    # data[subject_session][11] = Training session 4
-    # data[subject_session][12] = Online session 1 (w/ feedback)
-    # data[subject_session][13] = Online session 2 (w/ feedback)
-    # data[subject_session][14] = Online session 3 (w/ feedback)
-    # data[subject_session][15] = Online session 4 (w/ feedback)
-    # data[subject_session][16] = Online session 5 (w/ feedback)
-    # data[subject_session][17] = Online session 6 (w/ feedback)
-    # data[subject_session][18] = Online session 7 (w/ feedback)
-    # data[subject_session][19] = Online session 8 (w/ feedback)
-    # data[subject_session][20] = Reading span task 1
-    # data[subject_session][21] = Reading span task 2
-    # data[subject_session][22] = Reading span task 3
-    # data[subject_session][23] = Reading span task 4
-    # data[subject_session][24] = Reading span task 5
-    # data[subject_session][25] = Reading span task 6
-    # data[subject_session][26] = Reading span task 7
-    # data[subject_session][27] = Reading span task 8
-    # data[subject_session][28] = Reading span task 9
-    # data[subject_session][29] = Reading span task 10
+    # Current data format: data[subject][session] holds all 30 raw objects for a given subject's session
+    # data[subject][session][0] = Closed eyes baseline
+    # data[subject][session][1] = Open eyes baseline
+    # data[subject][session][2] = Nback task 1
+    # data[subject][session][3] = Nback task 2
+    # data[subject][session][4] = Nback task 3
+    # data[subject][session][5] = Nback task 4
+    # data[subject][session][6] = Nback task 5
+    # data[subject][session][7] = Nback task 6
+    # data[subject][session][8] = Training session 1
+    # data[subject][session][9] = Training session 2
+    # data[subject][session][10] = Training session 3
+    # data[subject][session][11] = Training session 4
+    # data[subject][session][12] = Online session 1 (w/ feedback)
+    # data[subject][session][13] = Online session 2 (w/ feedback)
+    # data[subject][session][14] = Online session 3 (w/ feedback)
+    # data[subject][session][15] = Online session 4 (w/ feedback)
+    # data[subject][session][16] = Online session 5 (w/ feedback)
+    # data[subject][session][17] = Online session 6 (w/ feedback)
+    # data[subject][session][18] = Online session 7 (w/ feedback)
+    # data[subject][session][19] = Online session 8 (w/ feedback)
+    # data[subject][session][20] = Reading span task 1
+    # data[subject][session][21] = Reading span task 2
+    # data[subject][session][22] = Reading span task 3
+    # data[subject][session][23] = Reading span task 4
+    # data[subject][session][24] = Reading span task 5
+    # data[subject][session][25] = Reading span task 6
+    # data[subject][session][26] = Reading span task 7
+    # data[subject][session][27] = Reading span task 8
+    # data[subject][session][28] = Reading span task 9
+    # data[subject][session][29] = Reading span task 10
 
-    if between:  # if analyzing between-session performance (i.e. leave one session out)...
+    if between:
         # dic_data_format = participant number (+ _N for train) (+ _N++ for test) : mne raw object
         dic_data = {}
-        for i in data.keys():  # for every subject...
-            for j in range(1, 13):
-                session = str(i) + '_' + str(j)
-                dic_data[session] = data[i][j + 7]  # place their sessions into one dictionary following indexes above
+        for sub in data.keys():  # for every subject...
+            for sess in range(len(sessions)):  # for each session...
+                for i in range(1, 13):  # place all their relevant train/test sessions into one dictionary
+                    session = sub + "_" + sessions[sess] + "_" + str(i)  # their numbering will start from 1...
+                    dic_data[session] = data[sub][sess][i + 7]  # but indices must follow above rules (hence the +7)
         return data, dic_data
-    if within:  # if analyzing within-session performance (using the given train/test sets)
+    if within:
         dic_data_train = {}
         dic_data_test = {}
-        for i in data.keys():  # for every subject-session...
-            for j in range(1, 5):  # place their training sessions (4) into one dictionary
-                session = str(i) + '_' + str(j)  # their numbering will start from 1...
-                dic_data_train[session] = data[i][j + 7]  # but indices must follow the comment above (hence the +7)
-            for j in range(5, 13):  # and their testing sessions (8) into another dictionary
-                session = str(i) + '_' + str(j)
-                dic_data_test[session] = data[i][j + 7]
+        for sub in data.keys():  # for every subject...
+            for sess in range(len(sessions)):  # for each session...
+                for i in range(1, 5):  # place their training sessions (4) into one dictionary
+                    session = sub + "_" + sessions[sess] + "_" + str(i)
+                    dic_data_train[session] = data[sub][sess][i + 7]
+                for i in range(5, 13):  # and their testing sessions (8) into another dictionary
+                    session = sub + "_" + sessions[sess] + "_" + str(i)
+                    dic_data_test[session] = data[sub][sess][i + 7]
         return data, dic_data_train, dic_data_test
 
