@@ -123,7 +123,7 @@ def test_pipeline_within_session(pipelines, session, steps_preprocess=None):
 #################
 
 # Establish master data path
-path = os.path.join("Data", "SS")
+path = os.path.join("../Data", "SS")
 
 # Load all files for a given range of participants
 # Format: [SUB]_[SESS]_[RUN_NAME].gdf
@@ -137,14 +137,9 @@ sessions = ["S1", "S2", "S3"]  # session IDs
 session_folders = ["Session 1", "Session 2", "Session 3"]  # session folders do not line up with session IDs
 subjects = next(os.walk(path))[1]  # Note: list of subjects is dynamically assigned here since they are non-consecutive
 
-"""
-IMPORTANT! To conform with INRIA pipeline but use multi-session data, each session is appended as a new "subject"
-This means that data takes the following format: data[sub_sess], ex: data["S01_S1"] for Subject 1 Session 1
-"""
-
-
 data = {}  # dictionary to hold all our data
 for sub in subjects:  # for each subject...
+    data[sub] = [[] for i in range(len(sessions))]  # within subject, create a list for each session
     for sess in range(len(sessions)):  # for each session... (used as an iterator due to sessions/session_folder issue)
         fnames = [sub + "_" + sessions[sess] + "_" + i + ".gdf" for i in runNames]  # develop a list of all filenames
         sub_data = []  # empty list to hold all of a subject's loaded files
@@ -163,40 +158,39 @@ for sub in subjects:  # for each subject...
                 else:  # mark the rest as regular EEG
                     new_types.append("eeg")
             i.set_channel_types(dict(zip(i.ch_names, new_types)))  # apply new channel types to raw object
-        name = sub + '_' + sessions[sess]  # make a new name so that each session is viewed as its own subject
-        data[name] = sub_data  # save sub_data list into data dictionary
+        data[sub][sess] = sub_data  # save sub_data list into data dictionary
 
-# Current data format: data[subject] holds all 30 raw objects
-# data[subject_session][0] = Closed eyes baseline
-# data[subject_session][1] = Open eyes baseline
-# data[subject_session][2] = Nback task 1
-# data[subject_session][3] = Nback task 2
-# data[subject_session][4] = Nback task 3
-# data[subject_session][5] = Nback task 4
-# data[subject_session][6] = Nback task 5
-# data[subject_session][7] = Nback task 6
-# data[subject_session][8] = Training session 1
-# data[subject_session][9] = Training session 2
-# data[subject_session][10] = Training session 3
-# data[subject_session][11] = Training session 4
-# data[subject_session][12] = Online session 1 (w/ feedback)
-# data[subject_session][13] = Online session 2 (w/ feedback)
-# data[subject_session][14] = Online session 3 (w/ feedback)
-# data[subject_session][15] = Online session 4 (w/ feedback)
-# data[subject_session][16] = Online session 5 (w/ feedback)
-# data[subject_session][17] = Online session 6 (w/ feedback)
-# data[subject_session][18] = Online session 7 (w/ feedback)
-# data[subject_session][19] = Online session 8 (w/ feedback)
-# data[subject_session][20] = Reading span task 1
-# data[subject_session][21] = Reading span task 2
-# data[subject_session][22] = Reading span task 3
-# data[subject_session][23] = Reading span task 4
-# data[subject_session][24] = Reading span task 5
-# data[subject_session][25] = Reading span task 6
-# data[subject_session][26] = Reading span task 7
-# data[subject_session][27] = Reading span task 8
-# data[subject_session][28] = Reading span task 9
-# data[subject_session][29] = Reading span task 10
+# Current data format: data[subject][session] holds all 30 raw objects for a given subject's session
+# data[subject][session][0] = Closed eyes baseline
+# data[subject][session][1] = Open eyes baseline
+# data[subject][session][2] = Nback task 1
+# data[subject][session][3] = Nback task 2
+# data[subject][session][4] = Nback task 3
+# data[subject][session][5] = Nback task 4
+# data[subject][session][6] = Nback task 5
+# data[subject][session][7] = Nback task 6
+# data[subject][session][8] = Training session 1
+# data[subject][session][9] = Training session 2
+# data[subject][session][10] = Training session 3
+# data[subject][session][11] = Training session 4
+# data[subject][session][12] = Online session 1 (w/ feedback)
+# data[subject][session][13] = Online session 2 (w/ feedback)
+# data[subject][session][14] = Online session 3 (w/ feedback)
+# data[subject][session][15] = Online session 4 (w/ feedback)
+# data[subject][session][16] = Online session 5 (w/ feedback)
+# data[subject][session][17] = Online session 6 (w/ feedback)
+# data[subject][session][18] = Online session 7 (w/ feedback)
+# data[subject][session][19] = Online session 8 (w/ feedback)
+# data[subject][session][20] = Reading span task 1
+# data[subject][session][21] = Reading span task 2
+# data[subject][session][22] = Reading span task 3
+# data[subject][session][23] = Reading span task 4
+# data[subject][session][24] = Reading span task 5
+# data[subject][session][25] = Reading span task 6
+# data[subject][session][26] = Reading span task 7
+# data[subject][session][27] = Reading span task 8
+# data[subject][session][28] = Reading span task 9
+# data[subject][session][29] = Reading span task 10
 
 
 ##################################
@@ -204,16 +198,16 @@ for sub in subjects:  # for each subject...
 ##################################
 
 # Follow format used by INRIA pipeline, to speed up analysis
-# dic_data_format = participant number (+ _1 or _2 for train) (+ _3-6 for test) : mne raw object
 dic_data_train = {}
 dic_data_test = {}
-for i in data.keys():  # for every subject...
-    for j in range(1, 5):  # place their training sessions (4) into one dictionary
-        session = str(i) + '_' + str(j)  # their numbering will start from 1...
-        dic_data_train[session] = data[i][j+7]  # but indices must follow the comment above (hence the +7)
-    for j in range(5, 13):  # and their testing sessions (8) into another dictionary
-        session = str(i) + '_' + str(j)
-        dic_data_test[session] = data[i][j+7]
+for sub in data.keys():  # for every subject...
+    for sess in range(len(sessions)):  # for each session...
+        for i in range(1, 5):  # place their training sessions (4) into one dictionary
+            session = sub + "_" + sessions[sess] + "_" + str(i)  # their numbering will start from 1...
+            dic_data_train[session] = data[sub][sess][i + 7]  # but indices must follow the comment above (hence the +7)
+        for i in range(5, 13):  # and their testing sessions (8) into another dictionary
+            session = sub + "_" + sessions[sess] + "_" + str(i)
+            dic_data_test[session] = data[sub][sess][i + 7]
 
 
 ################################
@@ -222,7 +216,7 @@ for i in data.keys():  # for every subject...
 
 # dictionary for all our testing pipelines
 pipelines = {}
-pipelines['8csp+lda'] = make_pipeline(CSP(n_components=8), LDA())  # baseline comparison CSP+LDA
+#pipelines['8csp+lda'] = make_pipeline(CSP(n_components=8), LDA())  # baseline comparison CSP+LDA
 pipelines['MDM'] = make_pipeline(Covariances(estimator='lwf'), MDM(metric='riemann', n_jobs=-1))  # simple Riemannian
 pipelines['tangentspace+LR'] = make_pipeline(Covariances(estimator='lwf'),
                                              TangentSpace(metric='riemann'),
@@ -233,9 +227,14 @@ pipelines['tangentspace+LR'] = make_pipeline(Covariances(estimator='lwf'),
 # RUN OUR ANALYSIS PIPELINE #
 #############################
 
-session = list(data.keys())  # a list of participants to be used for analysis
+subjects = list(data.keys())  # a list of participants to be used for analysis
+target = []
+for sub in subjects:
+    for sess in sessions:
+        target.append(sub + "_" + sess)
+
 steps_preprocess = {"filter": [8, 30],  # filter from 8-30Hz
                     "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
                     "tmin": 0.5, "tmax": 4, "overlap": 1/16, "length": 1,
                     "score": "EAcc"}
-accuracy = test_pipeline_within_session(pipelines, session, steps_preprocess)  # run pipeline!
+#accuracy = test_pipeline_within_session(pipelines, target, steps_preprocess)  # run pipeline!

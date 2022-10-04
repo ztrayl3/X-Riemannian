@@ -119,7 +119,7 @@ class DataGenerator(Sequence):
 #################
 
 # Establish master data path
-path = os.path.join("Data", "MS")
+path = os.path.join("../Data", "MS")
 
 # Load all files for a given range of participants
 # Format: [SUB]_[RUN_NAME].gdf
@@ -201,7 +201,7 @@ steps_preprocess = {"filter": [8, 30],  # filter from 8-30Hz
 
 my_callbacks = [
     EarlyStopping(patience=50, monitor="loss"),
-    ModelCheckpoint(filepath='Model/best_model.h5', save_best_only=True)
+    ModelCheckpoint(filepath='../Model/best_model.h5', save_best_only=True)
 ]
 
 performance = {}
@@ -238,6 +238,6 @@ for subject in (range(len(subjects))):  # for each subject
                           validation_data=valid_gen,
                           verbose=1)
 
-    model = load_model("Model/best_model.h5", custom_objects={"square": square, "log": log})
+    model = load_model("../Model/best_model.h5", custom_objects={"square": square, "log": log})
 
     performance[subject] = model.evaluate(x=test_gen)[1]  # format: performance[subject] = accuracy if subject left out

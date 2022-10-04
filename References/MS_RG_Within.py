@@ -124,7 +124,7 @@ def test_pipeline_within_session(pipelines, session, steps_preprocess=None):
 #################
 
 # Establish master data path
-path = os.path.join("Data", "MS")
+path = os.path.join("../Data", "MS")
 
 # Load all files for a given range of participants
 # Format: [SUB]_[RUN_NAME].gdf
