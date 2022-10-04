@@ -26,7 +26,7 @@ pipelines = {}
 pipelines['MDM'] = make_pipeline(Covariances(estimator='lwf'), MDM(metric='riemann', n_jobs=-1))  # simple Riemannian
 pipelines['tangentspace+LR'] = make_pipeline(Covariances(estimator='lwf'),
                                              TangentSpace(metric='riemann'),
-                                             LogisticRegression())  # more realistic Riemannian
+                                             LogisticRegression(max_iter=200, n_jobs=-1))  # more realistic Riemannian
 
 # session IDs for the single subject dataset
 sessions = ["S1", "S2", "S3"]
