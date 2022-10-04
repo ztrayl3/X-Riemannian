@@ -4,6 +4,12 @@ import numpy as np
 import pandas as pd
 from tensorflow.keras.utils import Sequence
 from tensorflow import one_hot
+from numpy.random import seed
+from tensorflow.keras.utils import set_random_seed
+mne.set_log_level(verbose="Warning")  # set all the mne verbose to warning
+
+seed(2002012)
+set_random_seed(2002012)
 
 
 def create_key(df, train=1, test=1):  # Create an array of keys to indicate train/test datasets

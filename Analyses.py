@@ -10,11 +10,8 @@ from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
 from pyriemann.classification import MDM
 from pyriemann.tangentspace import TangentSpace
 from pyriemann.estimation import Covariances
-
 from sklearn.pipeline import make_pipeline
 from sklearn.linear_model import LogisticRegression
-from numpy.random import seed
-seed(2002012)
 
 # Deep learning specific parameters
 input_window_samples = 1024
