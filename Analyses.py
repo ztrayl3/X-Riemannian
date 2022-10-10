@@ -1,5 +1,5 @@
 import numpy as np
-from INRIA import create_key, epoching, DataGenerator, load_MS, load_SS, test_pipeline
+from INRIA import create_key_MS, create_key_SS, epoching, DataGenerator, load_MS, load_SS, test_pipeline
 from EEGModels import ShallowConvNet, square, log
 from tensorflow.keras.metrics import BinaryAccuracy
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard
@@ -22,11 +22,11 @@ batch_size = 32
 
 # dictionary for all our testing pipelines
 pipelines = {}
-# pipelines['8csp+lda'] = make_pipeline(CSP(n_components=8), LDA())  # baseline comparison CSP+LDA
+#pipelines['8csp+lda'] = make_pipeline(CSP(n_components=8), LDA())  # baseline comparison CSP+LDA
 pipelines['MDM'] = make_pipeline(Covariances(estimator='lwf'), MDM(metric='riemann', n_jobs=-1))  # simple Riemannian
 pipelines['tangentspace+LR'] = make_pipeline(Covariances(estimator='lwf'),
                                              TangentSpace(metric='riemann'),
-                                             LogisticRegression(max_iter=200, n_jobs=-1))  # more realistic Riemannian
+                                             LogisticRegression(max_iter=350, n_jobs=-1))  # more realistic Riemannian
 
 # session IDs for the single subject dataset
 sessions = ["S1", "S2", "S3"]
@@ -60,8 +60,8 @@ def MS_DL_Between():
         train_id = subjects.copy()  # train on all
         test_id = train_id.pop(subject)  # except for one (leave one out)
 
-        key_train_valid = create_key(train_id, train=1, test=1)
-        key_test = create_key([test_id], train=0, test=1)
+        key_train_valid = create_key_MS(train_id, train=1, test=1)
+        key_test = create_key_MS([test_id], train=0, test=1)
 
         mask = np.array([True, True, True, True, False, False] * int(key_train_valid.shape[0]/6))
         np.random.shuffle(mask)
@@ -100,6 +100,58 @@ def MS_DL_Between():
 # Classifier : ShallowConvNet                               #
 # Condition  : Within Subject Performance (train/test set)  #
 #############################################################
+
+def MS_DL_Within():
+    data, dic_data_train, dic_data_test = load_MS(within=True)  # load multi-subject dataset for within subject analysis
+    n_chans = data[list(data)[0]][0].get_channel_types().count("eeg")  # load the first file, count how many eeg channels
+
+    steps_preprocess = {"filter": [8, 30],  # filter from 8-30Hz
+                        "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
+                        "tmin": 0.5, "tmax": 2.5, "overlap": 1, "length": 2}
+
+    my_callbacks = [
+        EarlyStopping(patience=50, monitor="loss"),
+        ModelCheckpoint(filepath='Model/best_model.h5', save_best_only=True)
+    ]
+
+    performance = {}
+    subjects = list(data.keys())  # a list of participants to be used for analysis
+
+    for subject in (range(len(subjects))):  # for each subject
+        ID = subjects[subject]  # training and testing on the same subject!
+
+        key_train_valid = np.array([ID + "_1", ID + "_2"])  # grab the subject's training data
+        key_test = np.array([ID + "_3", ID + "_4", ID + "_5", ID + "_6"])  # grab the subject's test data
+
+        mask = np.array([True, False])  # only a length of 2 because we only have 2 training/validation files
+        np.random.shuffle(mask)
+        key_train = key_train_valid[mask]
+        key_valid = key_train_valid[~mask]
+
+        X_train, Y_train = epoching(dic_data_train, key_train, steps_preprocess, DL=True)
+        X_valid, Y_valid = epoching(dic_data_train, key_valid, steps_preprocess, DL=True)
+        X_test, Y_test = epoching(dic_data_test, key_test, steps_preprocess, DL=True)
+
+        train_gen = DataGenerator(X_train, Y_train, 64)
+        valid_gen = DataGenerator(X_valid, Y_valid, 64)
+        test_gen = DataGenerator(X_test, Y_test, 64)
+
+        model = ShallowConvNet(nb_classes=n_classes, Chans=n_chans, Samples=input_window_samples)
+        model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=BinaryAccuracy())
+
+        fit_model = model.fit(x=train_gen,
+                              batch_size=batch_size,
+                              epochs=n_epochs,
+                              callbacks=my_callbacks,
+                              validation_data=valid_gen,
+                              verbose=1)
+
+        model = load_model("Model/best_model.h5", custom_objects={"square": square, "log": log})
+
+        performance[ID] = model.evaluate(x=test_gen)[1]
+        # format: performance[subject] = accuracy of within-subject classification
+
+    return performance
 
 
 #############################################################

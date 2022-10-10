@@ -12,7 +12,8 @@ seed(2002012)
 set_random_seed(2002012)
 
 
-def create_key(df, train=1, test=1):  # Create an array of keys to indicate train/test datasets
+def create_key_MS(df, train=1, test=1):  # Create an array of keys to indicate train/test datasets
+    print("Creating keys...")  # for progress tracking
     if "A59" in df:  # handle potential problems from subject A59
         keys = np.empty(shape=len(df) * train * 2 + (len(df) * test * 4) - 2 * test,  dtype=np.dtype('<U8'))
     else:
@@ -33,7 +34,23 @@ def create_key(df, train=1, test=1):  # Create an array of keys to indicate trai
     return keys
 
 
+def create_key_SS(df, train=1, test=1):  # Create an array of keys to indicate train/test datasets
+    print("Creating keys...")  # for progress tracking
+    keys = np.empty(shape=len(df) * train * 4 + (len(df) * test * 8),  dtype=np.dtype('<U8'))
+    i = 0
+    for val in df:
+        if train:
+            keys[i: i+4] = [val+"_1", val+"_2", val+"_3", val+"_4"]
+            i += 4
+        if test:
+            keys[i: i+8] = [val+"_5", val+"_6", val+"_7", val+"_8", val+"_9", val+"_10", val+"_11", val+"_12"]
+            i += 8
+
+    return keys
+
+
 def preprocess(raw, steps={}):
+    print("Preprocessing raw data...")  # for progress tracking
     """ preprocess the data"""
     assert isinstance(steps, dict), "steps must be a dictionary"
     raw.load_data()
@@ -50,7 +67,8 @@ def preprocess(raw, steps={}):
     return raw
 
 
-def epoching(dict, key_session=[], steps_preprocess=None, key_events={"769":0, "770": 1}, DL=False):
+def epoching(dict, key_session=[], steps_preprocess=None, key_events={"769": 0, "770": 1}, DL=False):
+    print("Epoching the data...")  # for progress tracking
     if DL:  # if we are epoching for the Deep Learning classifier...
         """From the dictionary of mne.rawGDF extract all the epochs selected with Key_session
          Return the epochs list as X and tje label as Y"""
@@ -65,7 +83,7 @@ def epoching(dict, key_session=[], steps_preprocess=None, key_events={"769":0, "
         list_start = np.arange(tmin, (tmax + overlap) - length_epoch, overlap)
         list_stop = np.arange(tmin+length_epoch, (tmax+overlap), overlap)
 
-        n_chans = dict[key_session[0]].get_channel_types().count("eeg")  # take the first EEG file, how many EEG channels?
+        n_chans = dict[key_session[0]].get_channel_types().count("eeg")  # take the first EEG file, how many channels?
         time_step = int(length_epoch * dict[key_session[0]].info['sfreq'])  # get sampling frequency
         n_events = len(list_start) * 40 * len(key_session)  # 40 represent the number of events in each raw data
 
@@ -111,8 +129,17 @@ def epoching(dict, key_session=[], steps_preprocess=None, key_events={"769":0, "
             if steps_preprocess is not None:
                 _ = preprocess(dict[key], steps_preprocess)
 
+            # MNE recommends the following process prior to signal decimation:
+            current_sfreq = dict[key].info['sfreq']
+            desired_sfreq = 256  # Hz
+            decim = np.round(current_sfreq / desired_sfreq).astype(int)
+            obtained_sfreq = current_sfreq / decim
+            lowpass_freq = obtained_sfreq / 3.0
+            dict[key].filter(l_freq=None, h_freq=lowpass_freq, n_jobs=-1)
+
             epoch = mne.Epochs(dict[key], mne.events_from_annotations(dict[key], key_events)[0], tmin=-1, tmax=5,
-                               baseline=(None, 0), verbose="CRITICAL")
+                               baseline=(None, 0), verbose="CRITICAL", decim=decim)[list(key_events.values())]
+            # NOTE: we are decimating the signal to 256 Hz and only grabbing 2 events to speed up processing
 
             list_start = np.arange(tmin, (tmax + overlap) - length_epoch, overlap)
             list_stop = np.arange(tmin + length_epoch, (tmax + overlap), overlap)
@@ -151,6 +178,7 @@ def test_pipeline(test, pipelines, session, steps_preprocess, train=None,
     for subject in session:  # this will be something like "A10" for MS and "S06_S1" for SS
         if between:  # between subject/session analysis: no train set, just leave-one-out
             if MS:  # using the multi subject dataset
+                print("Running a leave-one-out classification, leaving out every MS subject one at a time...")  # for progress tracking
                 train_key = {k: v for k, v in test.items() if subject not in k}  # train on all subjects data EXCEPT one
                 test_key = {k: v for k, v in test.items() if subject in k}  # test on that subject
 
@@ -158,6 +186,7 @@ def test_pipeline(test, pipelines, session, steps_preprocess, train=None,
                 X_test, Y_test = epoching(test, test_key, steps_preprocess)  # same as above, but test set
 
             if SS:  # using the single subject dataset
+                print("Running a leave-one-out classification grouped by subject, leaving out one session at a time...")  # for progress tracking
                 # group by subject, since we're focused on between-session not subject here
                 # We will take the "subject" (in this case S0#_S#) and treat that as our leave-out session
                 subID = subject[:3]  # grab the subject ID
@@ -170,6 +199,7 @@ def test_pipeline(test, pipelines, session, steps_preprocess, train=None,
 
         if within:  # within subject/session analysis: utilize the built-in train/test sets
             if MS:  # using the multi subject dataset
+                print("Running a simple train/test set classification with each MS subject trained and tested on their own data")   # for progress tracking
                 train_key = [subject + "_1", subject + "_2"]
                 if subject == "A59":  # Manage the error during the data acquisition of A59
                     test_key = [subject + "_3", subject + "_4"]
@@ -180,6 +210,7 @@ def test_pipeline(test, pipelines, session, steps_preprocess, train=None,
                 X_test, Y_test = epoching(test, test_key, steps_preprocess)  # same as above, but test set
 
             if SS:  # using the single subject dataset
+                print("Running a simple train/test set classification with each SS subject trained and tested on their own data")  # for progress tracking
                 train_key = [subject + "_1", subject + "_2", subject + "_3", subject + "_4"]
                 test_key = [subject + "_5", subject + "_6", subject + "_7", subject + "_8",
                             subject + "_9", subject + "_10", subject + "_11", subject + "_12"]
@@ -223,6 +254,7 @@ def test_pipeline(test, pipelines, session, steps_preprocess, train=None,
 
 
 def load_MS(between=False, within=False):
+    print("Loading the MS dataset (all subjects that are available)...")  # for progress tracking
     # Establish master data path
     path = os.path.join("Data", "MS")
 
@@ -297,6 +329,7 @@ def load_MS(between=False, within=False):
 
 
 def load_SS(between=False, within=False):
+    print("Loading the SS dataset (all subjects and sessions that are available)...")  # for progress tracking
     # Establish master data path
     path = os.path.join("Data", "SS")
 
