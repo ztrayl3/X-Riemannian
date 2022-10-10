@@ -36,7 +36,7 @@ def create_key_MS(df, train=1, test=1):  # Create an array of keys to indicate t
 
 def create_key_SS(df, train=1, test=1):  # Create an array of keys to indicate train/test datasets
     print("Creating keys...")  # for progress tracking
-    keys = np.empty(shape=len(df) * train * 4 + (len(df) * test * 8),  dtype=np.dtype('<U8'))
+    keys = np.empty(shape=len(df) * train * 4 + (len(df) * test * 8), dtype=np.dtype('<U8'))
     i = 0
     for val in df:
         if train:
@@ -99,14 +99,13 @@ def epoching(dict, key_session=[], steps_preprocess=None, key_events={"769": 0, 
             epoch = mne.Epochs(dict[key], mne.events_from_annotations(dict[key], key_events)[0],
                                tmin=-1, tmax=5)  # epoch data from annotations
 
-            assert len(epoch.events[:, 2]) == 40, ("'%s' don't have 40 events it actually have %s " %
-                                                   (key, len(epoch.events[:, 2])))
+            event_count = len(epoch.events[:, 2])
 
             for start, stop in zip(list_start, list_stop):
 
-                X[i: i + 40] = epoch.get_data(tmin=start, tmax=stop)
-                Y[i: i + 40] = epoch.events[:, 2]
-                i += 40
+                X[i: i + event_count] = epoch.get_data(tmin=start, tmax=stop)
+                Y[i: i + event_count] = epoch.events[:, 2]
+                i += event_count
 
         Y = one_hot(Y, depth=2)  # one-hot encode the labels
 
