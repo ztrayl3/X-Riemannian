@@ -1,11 +1,10 @@
 import numpy as np
 import pandas as pd
-from INRIA import create_key_MS, create_key_SS, epoching, DataGenerator, load_MS, load_SS, test_pipeline
+from INRIA import create_key_MS, epoching, DataGenerator, load_MS, load_SS, test_pipeline
 from EEGModels import ShallowConvNet, square, log
 from tensorflow.keras.metrics import BinaryAccuracy
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard
 from keras.models import load_model
-import torch
 from mne.decoding import CSP
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
 from pyriemann.classification import MDM
@@ -17,7 +16,6 @@ from sklearn.linear_model import LogisticRegression
 # Deep learning specific parameters
 input_window_samples = 1024
 n_epochs = 500
-cuda = torch.cuda.is_available()
 n_classes = 2
 batch_size = 32
 
