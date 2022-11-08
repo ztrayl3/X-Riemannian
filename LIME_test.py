@@ -11,8 +11,9 @@ import numpy as np
 import pandas as pd
 from numpy.random import seed
 from lime import lime_tabular
+from tqdm import tqdm
 mne.set_log_level(verbose="Warning")  # set all the mne verbose to warning
-
+sfreq = 0
 seed(2002012)
 
 
@@ -29,21 +30,6 @@ class LIMEd():
 
     def transform(self, X):
         return LIME_format(X)
-
-
-class snoop():
-    """
-    This is a dummy pipeline step. Its sole purpose is to take print the shape of the data at this step
-    """
-    def __init__(self, test):
-        self.test = test
-
-    def fit(self, X, y=None, **fit_params):
-        return self
-
-    def transform(self, X):
-        print(X.shape)
-        return X
 
 
 def LIME_format(input):
@@ -88,17 +74,8 @@ def epoching(dict, key_session=[], steps_preprocess=None, key_events={"769": 0, 
         if steps_preprocess is not None:
             _ = preprocess(dict[key], steps_preprocess)
 
-        # MNE recommends the following process prior to signal decimation:
-        current_sfreq = dict[key].info['sfreq']
-        desired_sfreq = 256  # Hz
-        decim = np.round(current_sfreq / desired_sfreq).astype(int)
-        obtained_sfreq = current_sfreq / decim
-        lowpass_freq = obtained_sfreq / 3.0
-        dict[key].filter(l_freq=None, h_freq=lowpass_freq, n_jobs=-1)
-
         epoch = mne.Epochs(dict[key], mne.events_from_annotations(dict[key], key_events)[0], tmin=-1, tmax=5,
-                           baseline=(None, 0), verbose="CRITICAL", decim=decim)[list(key_events.values())]
-        # NOTE: we are decimating the signal to 256 Hz and only grabbing 2 events to speed up processing
+                           baseline=(None, 0), verbose="CRITICAL")[list(key_events.values())]
 
         list_start = np.arange(tmin, (tmax + overlap) - length_epoch, overlap)
         list_stop = np.arange(tmin + length_epoch, (tmax + overlap), overlap)
@@ -129,13 +106,15 @@ def test_pipeline(test, pipelines, session, steps_preprocess):
 
         for classifier in pipelines.keys():
             print("Fitting classifier: {}".format(classifier))
-            newTrain = LIME_format(X_train.copy())
-            newTest = LIME_format(X_test.copy())
-            # fit must get LIMEd data, since it will automatically un-lime it during training
-            pipelines[classifier].fit(newTrain, Y_train)
+            scale = lambda x: x * 1e6  # function to scale EEG data
+            newTrain = np.apply_along_axis(scale, 1, LIME_format(X_train.copy()))  # scale the samples, but
+            newTest = np.apply_along_axis(scale, 1, LIME_format(X_test.copy()))  # only apply it to the timesteps dim
 
             if steps_preprocess["score"] == "TAcc":
+                # fit gets un-LIMEd data
+                pipelines[classifier].fit(X_train, Y_train)
 
+                print("Calculating classifier accuracy...")
                 # ---------------------------------------------
                 tmin = steps_preprocess["tmin"]
                 tmax = steps_preprocess["tmax"]
@@ -155,27 +134,61 @@ def test_pipeline(test, pipelines, session, steps_preprocess):
                 accuracy.loc[subject, classifier] = temporary_accuracy.mean()
 
             elif steps_preprocess["score"] == "EAcc":
+                # fit gets un-LIMEd data
+                pipelines[classifier].fit(X_train, Y_train)
+
+                print("Calculating classifier accuracy...")
                 try:
                     accuracy.loc[subject, classifier] = pipelines[classifier].score(X_test, Y_test)
                 except:
                     accuracy.loc[subject, classifier] = np.nan
             elif steps_preprocess["score"] == "LIME":
-                print("Caclulating LIME values...")
+                # fit must get LIMEd data, since it will automatically un-lime it during training
+                pipelines[classifier].fit(newTrain, Y_train)
+
+                print("Calculating LIME values...")
                 channels = ['Fz', 'FCz', 'Cz', 'CPz', 'Pz', 'C1', 'C3', 'C5', 'C2', 'C4',
                             'C6', 'F4', 'FC2', 'FC4', 'FC6', 'CP2', 'CP4', 'CP6', 'P4',
                             'F3', 'FC1', 'FC3', 'FC5', 'CP1', 'CP3', 'CP5', 'P3']
+                global sfreq  # grab our global sampling frequency
                 explainer = lime_tabular.RecurrentTabularExplainer(newTrain, training_labels=Y_train,
                                                                    feature_names=channels,
-                                                                   discretize_continuous=True,
-                                                                   class_names=['Left', 'Right'],
-                                                                   discretizer='decile')
+                                                                   discretize_continuous=False,
+                                                                   class_names=['Left', 'Right'])
+                """
+                                                                     mimics    [   0       1   ]
+                """
 
                 # TODO: make this compute average of every sample with a given label, rather than a random sample
-                N = np.random.randint(0, 492)  # grab a random epoch
-                exp = explainer.explain_instance(newTest[N], pipelines[classifier].predict_proba,
-                                                 num_features=27, labels=(0, 1))  # explain it
+                first = True
+                LIMEans = dict(Left={}, Right={})  # dictionary for predictions of both possible classes
+                for instance in tqdm(range(100)):  # for each epoch...
+                    sample = newTest[instance]
+                    exp = explainer.explain_instance(sample, pipelines[classifier].predict_proba,
+                                                     num_features=int(len(channels) * sfreq),
+                                                     num_samples=1000,
+                                                     labels=(0, 1))  # explain it for both classes, every timestep
 
-                accuracy.loc[subject, classifier] = exp  # save the explanation
+                    if first:  # only create dictionary once
+                        # for each Channel_t-timestamp, give them an empty list in a dict
+                        LIMEans["Left"] = {feature: [] for feature in exp.domain_mapper.feature_names}
+                        LIMEans["Right"] = {feature: [] for feature in exp.domain_mapper.feature_names}
+
+                    predicted_index = np.argmax(exp.predict_proba)  # select the class that was predicted
+                    predicted = exp.class_names[predicted_index]  # get the string name of that class
+                    for feature in exp.local_exp[predicted_index]:  # for each Channel_t-timestamp's contribution
+                        index = feature[0]
+                        val = feature[1]
+                        LIMEans[predicted][exp.domain_mapper.feature_names[index]].append(val)  # save it in the dict
+
+                print("Averaging LIME values...")
+                for feature in exp.domain_mapper.feature_names:  # for each Channel_t-timestamp...
+                    # calculate the average contribution for each feature (and class)
+                    LIMEans["Left"][feature] = np.mean(LIMEans["Left"][feature])
+                    LIMEans["Right"][feature] = np.mean(LIMEans["Right"][feature])
+
+                return LIMEans  # Todo: this is not properly averaging the channel_t-timsteps. Fix
+                accuracy.loc[subject, classifier] = LIMEans  # save the dict of averages
             else:
                 raise AttributeError("The chosen score does not exist!")
 
@@ -225,6 +238,8 @@ def load_MS(between=False, within=False):
                         new_types.append("eeg")
                 i.set_channel_types(dict(zip(i.ch_names, new_types)))  # apply new channel types to raw object
 
+            global sfreq
+            sfreq = sub_data[0].info["sfreq"]
             data[sub] = sub_data  # save sub_data list into data dictionary
 
     # Current data format: data[subject] holds all 8 raw objects
@@ -275,15 +290,13 @@ def MS_RG_Between():
 
 # dictionary for all our testing pipelines
 pipelines = {}
-pipelines['8csp+lda'] = make_pipeline(LIMEd(test=True),
-                                      CSP(n_components=8),
-                                      LDA())  # baseline comparison CSP+LDA
+#pipelines['8csp+lda'] = make_pipeline(LIMEd(test=True),
+#                                      CSP(n_components=8),
+#                                      LDA())  # baseline comparison CSP+LDA
 pipelines['MDM'] = make_pipeline(LIMEd(test=True),
                                  Covariances(estimator='lwf'),
-                                 snoop(test=True),
                                  MDM(metric='riemann', n_jobs=-1))  # simple Riemannian
-pipelines['tangentspace+LR'] = make_pipeline(LIMEd(test=True),
-                                             Covariances(estimator='lwf'),
-                                             TangentSpace(metric='riemann'),
-                                             LogisticRegression(max_iter=350, n_jobs=-1))  # more realistic Riemannian
-
+#pipelines['tangentspace+LR'] = make_pipeline(LIMEd(test=True),
+#                                             Covariances(estimator='lwf'),
+#                                             TangentSpace(metric='riemann'),
+#                                             LogisticRegression(max_iter=350, n_jobs=-1))  # more realistic Riemannian
