@@ -183,13 +183,12 @@ def test_pipeline(test, pipelines, session, steps_preprocess):
 
                 first = True
                 LIMEans = dict(Left={}, Right={})  # dictionary for predictions of both possible classes
-                #for instance in tqdm(range(len(newTest))):  # for each epoch...
-                for instance in tqdm(range(100)):  # for a "random" sample of 100 epochs...
+                for instance in tqdm(range(len(newTest))):  # for each epoch...
                     for i in range(0, 2):  # explain for one class at a time
                         sample = newTest[instance]
                         exp = explainer.explain_instance(sample, pipelines[classifier].predict_proba,
                                                          num_features=int(len(channels) * sfreq),
-                                                         num_samples=1000,
+                                                         num_samples=5000,
                                                          labels=(i,))  # choose the correct class
 
                         if first:  # only create dictionary once
