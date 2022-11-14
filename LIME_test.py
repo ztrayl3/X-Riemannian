@@ -94,7 +94,8 @@ def epoching(dict, key_session=[], steps_preprocess=None, key_events={"769": 0, 
 
 def test_pipeline(test, pipelines, session, steps_preprocess):
     """ Take in input the different pipelines to test and return the corresponding classification accuracy"""
-    accuracy = pd.DataFrame(np.zeros((len(session), len(pipelines))), index=session, columns=pipelines.keys())
+    #accuracy = pd.DataFrame(np.zeros((len(session), len(pipelines))), index=session, columns=pipelines.keys())
+    accuracy = []
 
     for subject in session:  # this will be something like "A10" for MS and "S06_S1" for SS
         print("Running a leave-one-out classification, leaving out {}".format(subject))  # for progress tracking
@@ -131,7 +132,14 @@ def test_pipeline(test, pipelines, session, steps_preprocess):
                 trial_predict = np.where(X_sum < 0, 0, 1)  # if the sum < 0, left. If >0, predict right
                 temporary_accuracy = np.where(trial_predict == Y_test[0::dist - 1], 1, 0)  # Compare predictions with observations
 
-                accuracy.loc[subject, classifier] = temporary_accuracy.mean()
+                #accuracy.loc[subject, classifier] = temporary_accuracy.mean()
+                accuracy.append(
+                    dict(
+                        subject=subject,
+                        classifier=classifier,
+                        value=temporary_accuracy.mean()
+                    )
+                )
 
             elif steps_preprocess["score"] == "EAcc":
                 # fit gets un-LIMEd data
@@ -139,9 +147,23 @@ def test_pipeline(test, pipelines, session, steps_preprocess):
 
                 print("Calculating classifier accuracy...")
                 try:
-                    accuracy.loc[subject, classifier] = pipelines[classifier].score(X_test, Y_test)
+                    #accuracy.loc[subject, classifier] = pipelines[classifier].score(X_test, Y_test)
+                    accuracy.append(
+                        dict(
+                            subject=subject,
+                            classifier=classifier,
+                            value=pipelines[classifier].score(X_test, Y_test)
+                        )
+                    )
                 except:
-                    accuracy.loc[subject, classifier] = np.nan
+                    #accuracy.loc[subject, classifier] = np.nan
+                    accuracy.append(
+                        dict(
+                            subject=subject,
+                            classifier=classifier,
+                            value=np.nan
+                        )
+                    )
             elif steps_preprocess["score"] == "LIME":
                 # fit must get LIMEd data, since it will automatically un-lime it during training
                 pipelines[classifier].fit(newTrain, Y_train)
@@ -159,27 +181,30 @@ def test_pipeline(test, pipelines, session, steps_preprocess):
                                                                      mimics    [   0       1   ]
                 """
 
-                # TODO: make this compute average of every sample with a given label, rather than a random sample
                 first = True
                 LIMEans = dict(Left={}, Right={})  # dictionary for predictions of both possible classes
-                for instance in tqdm(range(100)):  # for each epoch...
-                    sample = newTest[instance]
-                    exp = explainer.explain_instance(sample, pipelines[classifier].predict_proba,
-                                                     num_features=int(len(channels) * sfreq),
-                                                     num_samples=1000,
-                                                     labels=(0, 1))  # explain it for both classes, every timestep
+                #for instance in tqdm(range(len(newTest))):  # for each epoch...
+                for instance in tqdm(range(100)):  # for a "random" sample of 100 epochs...
+                    for i in range(0, 2):  # explain for one class at a time
+                        sample = newTest[instance]
+                        exp = explainer.explain_instance(sample, pipelines[classifier].predict_proba,
+                                                         num_features=int(len(channels) * sfreq),
+                                                         num_samples=1000,
+                                                         labels=(i,))  # choose the correct class
 
-                    if first:  # only create dictionary once
-                        # for each Channel_t-timestamp, give them an empty list in a dict
-                        LIMEans["Left"] = {feature: [] for feature in exp.domain_mapper.feature_names}
-                        LIMEans["Right"] = {feature: [] for feature in exp.domain_mapper.feature_names}
+                        if first:  # only create dictionary once
+                            # for each Channel_t-timestamp, give them an empty list in a dict
+                            LIMEans["Left"] = {feature: [] for feature in exp.domain_mapper.feature_names}
+                            LIMEans["Right"] = {feature: [] for feature in exp.domain_mapper.feature_names}
+                            first = False
 
-                    predicted_index = np.argmax(exp.predict_proba)  # select the class that was predicted
-                    predicted = exp.class_names[predicted_index]  # get the string name of that class
-                    for feature in exp.local_exp[predicted_index]:  # for each Channel_t-timestamp's contribution
-                        index = feature[0]
-                        val = feature[1]
-                        LIMEans[predicted][exp.domain_mapper.feature_names[index]].append(val)  # save it in the dict
+                        for feature in exp.local_exp[i]:  # for each Channel_t-timestamp's contribution
+                            index = feature[0]
+                            val = feature[1]
+                            if i == 0:
+                                LIMEans["Left"][exp.domain_mapper.feature_names[index]].append(val)  # save it in the dict
+                            elif i == 1:
+                                LIMEans["Right"][exp.domain_mapper.feature_names[index]].append(val)  # save it in the dict
 
                 print("Averaging LIME values...")
                 for feature in exp.domain_mapper.feature_names:  # for each Channel_t-timestamp...
@@ -187,8 +212,14 @@ def test_pipeline(test, pipelines, session, steps_preprocess):
                     LIMEans["Left"][feature] = np.mean(LIMEans["Left"][feature])
                     LIMEans["Right"][feature] = np.mean(LIMEans["Right"][feature])
 
-                return LIMEans  # Todo: this is not properly averaging the channel_t-timsteps. Fix
-                accuracy.loc[subject, classifier] = LIMEans  # save the dict of averages
+                #accuracy.loc[subject, classifier] = LIMEans  # save the dict of averages
+                accuracy.append(
+                    dict(
+                        subject=subject,
+                        classifier=classifier,
+                        value=LIMEans
+                    )
+                )
             else:
                 raise AttributeError("The chosen score does not exist!")
 
@@ -290,13 +321,13 @@ def MS_RG_Between():
 
 # dictionary for all our testing pipelines
 pipelines = {}
-#pipelines['8csp+lda'] = make_pipeline(LIMEd(test=True),
-#                                      CSP(n_components=8),
-#                                      LDA())  # baseline comparison CSP+LDA
+pipelines['8csp+lda'] = make_pipeline(LIMEd(test=True),
+                                      CSP(n_components=8),
+                                      LDA())  # baseline comparison CSP+LDA
 pipelines['MDM'] = make_pipeline(LIMEd(test=True),
                                  Covariances(estimator='lwf'),
                                  MDM(metric='riemann', n_jobs=-1))  # simple Riemannian
-#pipelines['tangentspace+LR'] = make_pipeline(LIMEd(test=True),
-#                                             Covariances(estimator='lwf'),
-#                                             TangentSpace(metric='riemann'),
-#                                             LogisticRegression(max_iter=350, n_jobs=-1))  # more realistic Riemannian
+pipelines['tangentspace+LR'] = make_pipeline(LIMEd(test=True),
+                                             Covariances(estimator='lwf'),
+                                             TangentSpace(metric='riemann'),
+                                             LogisticRegression(max_iter=350, n_jobs=-1))  # more realistic Riemannian
