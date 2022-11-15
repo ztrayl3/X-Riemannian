@@ -308,9 +308,37 @@ def MS_RG_Between():
                         "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
                         "tmin": 0.5, "tmax": 4, "overlap": 1/16, "length": 1,
                         "score": "LIME"}
-    accuracy = test_pipeline(dic_data, pipelines, session, steps_preprocess)  # run it!
+    results = test_pipeline(dic_data, pipelines, session, steps_preprocess)  # run it!
 
-    return accuracy
+    for LIME in results:  # load each LIME dictionary from our results array
+        # grab relevant information
+        subject = LIME["subject"]  # string
+        classifier = LIME["classifier"]  # string
+        LEFT = LIME["value"]["Left"]  # dictionary {string: float}
+        RIGHT = LIME["value"]["Right"]  # dictionary {string: float}
+
+        # create dataframe for storage
+        classes = ["left", "right"]
+        colnames = ["Predicted", "Channel", "Time", "Weight"]
+        df = []
+        for i in classes:
+            for j in LEFT.keys():
+                key = j
+                if i == "left":
+                    value = LEFT[j]
+                if i == "right":
+                    value = RIGHT[j]
+
+                channel = key.split("-")[0][:-2]  # grab channel name, remove "_t" from end (string, 10-20 system)
+                time = key.split("-")[1]  # grab timestamp (int, 0-511 or 0-255 depending on sampling rate)
+                weight = value  # grab values
+
+                row = [i, channel, time, weight]
+                df.append(row)
+
+        out = pd.DataFrame(df, columns=colnames)
+        filename = subject + "_" + classifier + ".csv"
+        out.to_csv(filename)
 
 
 # dictionary for all our testing pipelines
