@@ -94,7 +94,6 @@ def epoching(dict, key_session=[], steps_preprocess=None, key_events={"769": 0, 
 
 def test_pipeline(test, pipelines, session, steps_preprocess):
     """ Take in input the different pipelines to test and return the corresponding classification accuracy"""
-    #accuracy = pd.DataFrame(np.zeros((len(session), len(pipelines))), index=session, columns=pipelines.keys())
     accuracy = []
 
     for subject in session:  # this will be something like "A10" for MS and "S06_S1" for SS
@@ -132,7 +131,6 @@ def test_pipeline(test, pipelines, session, steps_preprocess):
                 trial_predict = np.where(X_sum < 0, 0, 1)  # if the sum < 0, left. If >0, predict right
                 temporary_accuracy = np.where(trial_predict == Y_test[0::dist - 1], 1, 0)  # Compare predictions with observations
 
-                #accuracy.loc[subject, classifier] = temporary_accuracy.mean()
                 accuracy.append(
                     dict(
                         subject=subject,
@@ -147,7 +145,6 @@ def test_pipeline(test, pipelines, session, steps_preprocess):
 
                 print("Calculating classifier accuracy...")
                 try:
-                    #accuracy.loc[subject, classifier] = pipelines[classifier].score(X_test, Y_test)
                     accuracy.append(
                         dict(
                             subject=subject,
@@ -156,7 +153,6 @@ def test_pipeline(test, pipelines, session, steps_preprocess):
                         )
                     )
                 except:
-                    #accuracy.loc[subject, classifier] = np.nan
                     accuracy.append(
                         dict(
                             subject=subject,
@@ -188,7 +184,7 @@ def test_pipeline(test, pipelines, session, steps_preprocess):
                         sample = newTest[instance]
                         exp = explainer.explain_instance(sample, pipelines[classifier].predict_proba,
                                                          num_features=int(len(channels) * sfreq),
-                                                         num_samples=5000,
+                                                         num_samples=1000,
                                                          labels=(i,))  # choose the correct class
 
                         if first:  # only create dictionary once
@@ -211,7 +207,6 @@ def test_pipeline(test, pipelines, session, steps_preprocess):
                     LIMEans["Left"][feature] = np.mean(LIMEans["Left"][feature])
                     LIMEans["Right"][feature] = np.mean(LIMEans["Right"][feature])
 
-                #accuracy.loc[subject, classifier] = LIMEans  # save the dict of averages
                 accuracy.append(
                     dict(
                         subject=subject,
