@@ -217,7 +217,37 @@ def test_pipeline(test, pipelines, session, steps_preprocess):
             else:
                 raise AttributeError("The chosen score does not exist!")
 
-    return accuracy
+        # now that we have completed 1 subject, save their data to a csv file
+
+        # create dataframe for storage
+        classes = ["left", "right"]
+        colnames = ["Classifier", "Predicted", "Channel", "Time", "Weight"]
+        df = []
+        for LIME in accuracy:  # load each LIME dictionary from our results array
+            # grab relevant information
+            subject = LIME["subject"]  # string
+            classifier = LIME["classifier"]  # string
+            LEFT = LIME["value"]["Left"]  # dictionary {string: float}
+            RIGHT = LIME["value"]["Right"]  # dictionary {string: float}
+
+            for i in classes:  # for left / right predictions...
+                for j in LEFT.keys():  # for each channel-step
+                    key = j
+                    if i == "left":
+                        value = LEFT[j]
+                    if i == "right":
+                        value = RIGHT[j]
+
+                    channel = key.split("-")[0][:-2]  # grab channel name, remove "_t" from end (string, 10-20 system)
+                    time = key.split("-")[1]  # grab timestamp (int, 0-511 or 0-255 depending on sampling rate)
+                    weight = value  # grab values
+
+                    row = [classifier, i, channel, time, weight]
+                    df.append(row)
+
+        out = pd.DataFrame(df, columns=colnames)
+        filename = subject + ".csv"
+        out.to_csv(filename)
 
 
 def load_MS(between=False, within=False):
@@ -308,38 +338,7 @@ def MS_RG_Between():
                         "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
                         "tmin": 0.5, "tmax": 4, "overlap": 1/16, "length": 1,
                         "score": "LIME"}
-    results = test_pipeline(dic_data, pipelines, session, steps_preprocess)  # run it!
-
-    for LIME in results:  # load each LIME dictionary from our results array
-        # grab relevant information
-        subject = LIME["subject"]  # string
-        classifier = LIME["classifier"]  # string
-        LEFT = LIME["value"]["Left"]  # dictionary {string: float}
-        RIGHT = LIME["value"]["Right"]  # dictionary {string: float}
-
-        # create dataframe for storage
-        classes = ["left", "right"]
-        colnames = ["Predicted", "Channel", "Time", "Weight"]
-        df = []
-        for i in classes:
-            for j in LEFT.keys():
-                key = j
-                if i == "left":
-                    value = LEFT[j]
-                if i == "right":
-                    value = RIGHT[j]
-
-                channel = key.split("-")[0][:-2]  # grab channel name, remove "_t" from end (string, 10-20 system)
-                time = key.split("-")[1]  # grab timestamp (int, 0-511 or 0-255 depending on sampling rate)
-                weight = value  # grab values
-
-                row = [i, channel, time, weight]
-                df.append(row)
-
-        out = pd.DataFrame(df, columns=colnames)
-        filename = subject + "_" + classifier + ".csv"
-        out.to_csv(filename)
-
+    test_pipeline(dic_data, pipelines, session, steps_preprocess)  # run it!
 
 # dictionary for all our testing pipelines
 pipelines = {}
