@@ -253,7 +253,7 @@ def test_pipeline(test, pipelines, session, steps_preprocess):
 def load_MS(between=False, within=False):
     print("Loading the MS dataset (all subjects that are available)...")  # for progress tracking
     # Establish master data path
-    path = os.path.join("Data", "MS")
+    path = os.path.join("../Data", "MS")
 
     # Load all files for a given range of participants
     # Format: [SUB]_[RUN_NAME].gdf

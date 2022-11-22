@@ -2,14 +2,37 @@ import os
 import mne
 import numpy as np
 import pandas as pd
-from tensorflow.keras.utils import Sequence
-from tensorflow import one_hot
+from tqdm import tqdm
 from numpy.random import seed
+from lime import lime_tabular
+from tensorflow import one_hot
+from tensorflow.keras.utils import Sequence
 from tensorflow.keras.utils import set_random_seed
 mne.set_log_level(verbose="Warning")  # set all the mne verbose to warning
 
 seed(2002012)
 set_random_seed(2002012)
+sfreq = 0
+
+
+class LIMEd():
+    """
+    This is a dummy pipeline step. Its sole purpose is to take LIME formatted data (n_samples, n_timesteps, n_features)
+    and turn it back into MNE formatted data (epochs, features, samples).
+    """
+    def __init__(self, test):
+        self.test = test
+
+    def fit(self, X, y=None, **fit_params):
+        return self
+
+    def transform(self, X):
+        return LIME_format(X)
+
+
+def LIME_format(input):
+    # reformat data into (n_samples, n_timesteps, n_features)
+    return input.transpose(0, 2, 1)
 
 
 def create_key_MS(df, train=1, test=1):  # Create an array of keys to indicate train/test datasets
@@ -128,17 +151,8 @@ def epoching(dict, key_session=[], steps_preprocess=None, key_events={"769": 0, 
             if steps_preprocess is not None:
                 _ = preprocess(dict[key], steps_preprocess)
 
-            # MNE recommends the following process prior to signal decimation:
-            current_sfreq = dict[key].info['sfreq']
-            desired_sfreq = 256  # Hz
-            decim = np.round(current_sfreq / desired_sfreq).astype(int)
-            obtained_sfreq = current_sfreq / decim
-            lowpass_freq = obtained_sfreq / 3.0
-            dict[key].filter(l_freq=None, h_freq=lowpass_freq, n_jobs=-1)
-
             epoch = mne.Epochs(dict[key], mne.events_from_annotations(dict[key], key_events)[0], tmin=-1, tmax=5,
-                               baseline=(None, 0), verbose="CRITICAL", decim=decim)[list(key_events.values())]
-            # NOTE: we are decimating the signal to 256 Hz and only grabbing 2 events to speed up processing
+                               baseline=(None, 0), verbose="CRITICAL")[list(key_events.values())]
 
             list_start = np.arange(tmin, (tmax + overlap) - length_epoch, overlap)
             list_stop = np.arange(tmin + length_epoch, (tmax + overlap), overlap)
@@ -172,12 +186,11 @@ class DataGenerator(Sequence):
 def test_pipeline(test, pipelines, session, steps_preprocess, train=None,
                   between=False, within=False, MS=False, SS=False):
     """ Take in input the different pipelines to test and return the corresponding classification accuracy"""
-    accuracy = pd.DataFrame(np.zeros((len(session), len(pipelines))), index=session, columns=pipelines.keys())
-
     for subject in session:  # this will be something like "A10" for MS and "S06_S1" for SS
+        accuracy = []  # reset the results array for each subject to keep files from concatenating
         if between:  # between subject/session analysis: no train set, just leave-one-out
             if MS:  # using the multi subject dataset
-                print("Running a leave-one-out classification, leaving out every MS subject one at a time...")  # for progress tracking
+                print("Running a leave-one-out classification, leaving out {}".format(subject))  # for progress tracking
                 train_key = {k: v for k, v in test.items() if subject not in k}  # train on all subjects data EXCEPT one
                 test_key = {k: v for k, v in test.items() if subject in k}  # test on that subject
 
@@ -185,7 +198,7 @@ def test_pipeline(test, pipelines, session, steps_preprocess, train=None,
                 X_test, Y_test = epoching(test, test_key, steps_preprocess)  # same as above, but test set
 
             if SS:  # using the single subject dataset
-                print("Running a leave-one-out classification grouped by subject, leaving out one session at a time...")  # for progress tracking
+                print("Running a leave-one-out classification grouped by subject, leaving out {}".format(subject))  # for progress tracking
                 # group by subject, since we're focused on between-session not subject here
                 # We will take the "subject" (in this case S0#_S#) and treat that as our leave-out session
                 subID = subject[:3]  # grab the subject ID
@@ -198,7 +211,8 @@ def test_pipeline(test, pipelines, session, steps_preprocess, train=None,
 
         if within:  # within subject/session analysis: utilize the built-in train/test sets
             if MS:  # using the multi subject dataset
-                print("Running a simple train/test set classification with each MS subject trained and tested on their own data")   # for progress tracking
+                print("Running a simple train/test set classification with each MS subject"
+                      " trained and tested on their own data. Running subject {}".format(subject))   # for progress tracking
                 train_key = [subject + "_1", subject + "_2"]
                 if subject == "A59":  # Manage the error during the data acquisition of A59
                     test_key = [subject + "_3", subject + "_4"]
@@ -209,7 +223,8 @@ def test_pipeline(test, pipelines, session, steps_preprocess, train=None,
                 X_test, Y_test = epoching(test, test_key, steps_preprocess)  # same as above, but test set
 
             if SS:  # using the single subject dataset
-                print("Running a simple train/test set classification with each SS subject trained and tested on their own data")  # for progress tracking
+                print("Running a simple train/test set classification with each SS subject"
+                      " trained and tested on their own data. Running subject {}".format(subject))  # for progress tracking
                 train_key = [subject + "_1", subject + "_2", subject + "_3", subject + "_4"]
                 test_key = [subject + "_5", subject + "_6", subject + "_7", subject + "_8",
                             subject + "_9", subject + "_10", subject + "_11", subject + "_12"]
@@ -218,10 +233,16 @@ def test_pipeline(test, pipelines, session, steps_preprocess, train=None,
                 X_test, Y_test = epoching(test, test_key, steps_preprocess)  # same as above, but test set
 
         for classifier in pipelines.keys():
-            pipelines[classifier].fit(X_train, Y_train)
+            print("Fitting classifier: {}".format(classifier))
+            scale = lambda x: x * 1e6  # function to scale EEG data
+            newTrain = np.apply_along_axis(scale, 1, LIME_format(X_train.copy()))  # scale the samples, but
+            newTest = np.apply_along_axis(scale, 1, LIME_format(X_test.copy()))  # only apply it to the timesteps dim
 
             if steps_preprocess["score"] == "TAcc":
+                # fit gets un-LIMEd data
+                pipelines[classifier].fit(X_train, Y_train)
 
+                print("Calculating classifier accuracy...")
                 # ---------------------------------------------
                 tmin = steps_preprocess["tmin"]
                 tmax = steps_preprocess["tmax"]
@@ -236,20 +257,127 @@ def test_pipeline(test, pipelines, session, steps_preprocess, train=None,
                 X_sum = X_estim_reshape.sum(axis=0)
 
                 trial_predict = np.where(X_sum < 0, 0, 1)  # if the sum < 0, left. If >0, predict right
-                temporary_accuracy = np.where(trial_predict == Y_test[0::dist - 1], 1,
-                                              0)  # Compare predictions with observations
+                temporary_accuracy = np.where(trial_predict == Y_test[0::dist - 1], 1, 0)  # Compare predictions with observations
 
-                accuracy[classifier][subject] = temporary_accuracy.mean()
+                accuracy.append(
+                    dict(
+                        subject=subject,
+                        classifier=classifier,
+                        value=temporary_accuracy.mean()
+                    )
+                )
 
             elif steps_preprocess["score"] == "EAcc":
+                # fit gets un-LIMEd data
+                pipelines[classifier].fit(X_train, Y_train)
+
+                print("Calculating classifier accuracy...")
                 try:
-                    accuracy[classifier][subject] = pipelines[classifier].score(X_test, Y_test)
+                    accuracy.append(
+                        dict(
+                            subject=subject,
+                            classifier=classifier,
+                            value=pipelines[classifier].score(X_test, Y_test)
+                        )
+                    )
                 except:
-                    accuracy[classifier][subject] = np.nan
+                    accuracy.append(
+                        dict(
+                            subject=subject,
+                            classifier=classifier,
+                            value=np.nan
+                        )
+                    )
+            elif steps_preprocess["score"] == "LIME":
+                # fit must get LIMEd data, since it will automatically un-lime it during training
+                pipelines[classifier].fit(newTrain, Y_train)
+
+                print("Calculating LIME values...")
+                channels = ['Fz', 'FCz', 'Cz', 'CPz', 'Pz', 'C1', 'C3', 'C5', 'C2', 'C4',
+                            'C6', 'F4', 'FC2', 'FC4', 'FC6', 'CP2', 'CP4', 'CP6', 'P4',
+                            'F3', 'FC1', 'FC3', 'FC5', 'CP1', 'CP3', 'CP5', 'P3']
+                global sfreq  # grab our global sampling frequency
+                explainer = lime_tabular.RecurrentTabularExplainer(newTrain, training_labels=Y_train,
+                                                                   feature_names=channels,
+                                                                   discretize_continuous=False,
+                                                                   class_names=['Left', 'Right'])
+                """
+                                                                     mimics    [   0       1   ]
+                """
+
+                first = True
+                LIMEans = dict(Left={}, Right={})  # dictionary for predictions of both possible classes
+                #for instance in tqdm(range(len(newTest))):  # for each epoch...
+                for instance in tqdm(range(50)):  # for DEBUGGING
+                    for i in range(0, 2):  # explain for one class at a time
+                        sample = newTest[instance]
+                        exp = explainer.explain_instance(sample, pipelines[classifier].predict_proba,
+                                                         num_features=int(len(channels) * sfreq),
+                                                         num_samples=1000,
+                                                         labels=(i,))  # choose the correct class
+
+                        if first:  # only create dictionary once
+                            # for each Channel_t-timestamp, give them an empty list in a dict
+                            LIMEans["Left"] = {feature: [] for feature in exp.domain_mapper.feature_names}
+                            LIMEans["Right"] = {feature: [] for feature in exp.domain_mapper.feature_names}
+                            first = False
+
+                        for feature in exp.local_exp[i]:  # for each Channel_t-timestamp's contribution
+                            index = feature[0]
+                            val = feature[1]
+                            if i == 0:
+                                LIMEans["Left"][exp.domain_mapper.feature_names[index]].append(val)  # save it in the dict
+                            elif i == 1:
+                                LIMEans["Right"][exp.domain_mapper.feature_names[index]].append(val)  # save it in the dict
+
+                print("Averaging LIME values...")
+                for feature in exp.domain_mapper.feature_names:  # for each Channel_t-timestamp...
+                    # calculate the average contribution for each feature (and class)
+                    LIMEans["Left"][feature] = np.mean(LIMEans["Left"][feature])
+                    LIMEans["Right"][feature] = np.mean(LIMEans["Right"][feature])
+
+                accuracy.append(
+                    dict(
+                        subject=subject,
+                        classifier=classifier,
+                        value=LIMEans
+                    )
+                )
             else:
                 raise AttributeError("The chosen score does not exist!")
 
-    return accuracy
+        # now that we have completed 1 subject, save their data to a csv file
+
+        # create dataframe for storage
+        classes = ["left", "right"]
+        colnames = ["Classifier", "Predicted", "Channel", "Time", "Weight"]
+        df = []
+        for LIME in accuracy:  # load each LIME dictionary from our results array
+            # grab relevant information
+            subject = LIME["subject"]  # string
+            classifier = LIME["classifier"]  # string
+            LEFT = LIME["value"]["Left"]  # dictionary {string: float}
+            RIGHT = LIME["value"]["Right"]  # dictionary {string: float}
+
+            for i in classes:  # for left / right predictions...
+                for j in LEFT.keys():  # for each channel-step
+                    key = j
+                    if i == "left":
+                        value = LEFT[j]
+                    if i == "right":
+                        value = RIGHT[j]
+
+                    channel = key.split("-")[0][:-2]  # grab channel name, remove "_t" from end (string, 10-20 system)
+                    time = key.split("-")[1]  # grab timestamp (int, 0-511 or 0-255 depending on sampling rate)
+                    weight = value  # grab values
+
+                    row = [classifier, i, channel, time, weight]
+                    df.append(row)
+
+        out = pd.DataFrame(df, columns=colnames)
+        path = "Stats/"
+        filename = path + subject + ".csv"
+        out.to_csv(filename)
 
 
 def load_MS(between=False, within=False):
@@ -294,6 +422,9 @@ def load_MS(between=False, within=False):
                     else:  # mark the rest as regular EEG
                         new_types.append("eeg")
                 i.set_channel_types(dict(zip(i.ch_names, new_types)))  # apply new channel types to raw object
+
+            global sfreq
+            sfreq = sub_data[0].info["sfreq"]  # save the sampling frequency for later
             data[sub] = sub_data  # save sub_data list into data dictionary
 
     # Current data format: data[subject] holds all 8 raw objects
@@ -369,6 +500,9 @@ def load_SS(between=False, within=False):
                     else:  # mark the rest as regular EEG
                         new_types.append("eeg")
                 i.set_channel_types(dict(zip(i.ch_names, new_types)))  # apply new channel types to raw object
+
+            global sfreq
+            sfreq = sub_data[0].info["sfreq"]  # save the sampling frequency for later
             data[sub][sess] = sub_data  # save sub_data list into data dictionary
 
     # Current data format: data[subject][session] holds all 30 raw objects for a given subject's session

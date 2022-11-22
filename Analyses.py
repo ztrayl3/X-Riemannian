@@ -1,17 +1,17 @@
 import numpy as np
 import pandas as pd
-from INRIA import create_key_MS, epoching, DataGenerator, load_MS, load_SS, test_pipeline
-from EEGModels import ShallowConvNet, square, log
-from tensorflow.keras.metrics import BinaryAccuracy
-from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard
-from keras.models import load_model
 from mne.decoding import CSP
-from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
+from keras.models import load_model
 from pyriemann.classification import MDM
-from pyriemann.tangentspace import TangentSpace
-from pyriemann.estimation import Covariances
 from sklearn.pipeline import make_pipeline
+from pyriemann.estimation import Covariances
+from pyriemann.tangentspace import TangentSpace
+from EEGModels import ShallowConvNet, square, log
 from sklearn.linear_model import LogisticRegression
+from tensorflow.keras.metrics import BinaryAccuracy
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard
+from INRIA import create_key_MS, epoching, DataGenerator, load_MS, load_SS, test_pipeline, LIMEd
 
 # Deep learning specific parameters
 input_window_samples = 1024
@@ -21,9 +21,14 @@ batch_size = 32
 
 # dictionary for all our testing pipelines
 pipelines = {}
-#pipelines['8csp+lda'] = make_pipeline(CSP(n_components=8), LDA())  # baseline comparison CSP+LDA
-pipelines['MDM'] = make_pipeline(Covariances(estimator='lwf'), MDM(metric='riemann', n_jobs=-1))  # simple Riemannian
-pipelines['tangentspace+LR'] = make_pipeline(Covariances(estimator='lwf'),
+pipelines['8csp+lda'] = make_pipeline(LIMEd(test=True),
+                                      CSP(n_components=8),
+                                      LDA())  # baseline comparison CSP+LDA
+pipelines['MDM'] = make_pipeline(LIMEd(test=True),
+                                 Covariances(estimator='lwf'),
+                                 MDM(metric='riemann', n_jobs=-1))  # simple Riemannian
+pipelines['tangentspace+LR'] = make_pipeline(LIMEd(test=True),
+                                             Covariances(estimator='lwf'),
                                              TangentSpace(metric='riemann'),
                                              LogisticRegression(max_iter=350, n_jobs=-1))  # more realistic Riemannian
 
@@ -173,11 +178,8 @@ def MS_RG_Between():
     steps_preprocess = {"filter": [8, 30],  # filter from 8-30Hz
                         "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
                         "tmin": 0.5, "tmax": 4, "overlap": 1/16, "length": 1,
-                        "score": "EAcc"}
-    accuracy = test_pipeline(dic_data, pipelines, session, steps_preprocess,
-                             between=True, MS=True)  # run it!
-
-    return accuracy
+                        "score": "LIME"}
+    test_pipeline(dic_data, pipelines, session, steps_preprocess, between=True, MS=True)  # run it!
 
 
 #############################################################
@@ -197,11 +199,8 @@ def MS_RG_Within():
     steps_preprocess = {"filter": [8, 30],  # filter from 8-30Hz
                         "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
                         "tmin": 0.5, "tmax": 4, "overlap": 1/16, "length": 1,
-                        "score": "EAcc"}
-    accuracy = test_pipeline(dic_data_test, pipelines, session, steps_preprocess, dic_data_train,
-                             within=True, MS=True)
-
-    return accuracy
+                        "score": "LIME"}
+    test_pipeline(dic_data_test, pipelines, session, steps_preprocess, dic_data_train, within=True, MS=True)
 
 
 ########################################################################################################################
@@ -360,11 +359,8 @@ def SS_RG_Between():
     steps_preprocess = {"filter": [8, 30],  # filter from 8-30Hz
                         "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
                         "tmin": 0.5, "tmax": 4, "overlap": 1 / 16, "length": 1,
-                        "score": "EAcc"}
-    accuracy = test_pipeline(dic_data, pipelines, target, steps_preprocess,
-                             between=True, SS=True)
-
-    return accuracy
+                        "score": "LIME"}
+    test_pipeline(dic_data, pipelines, target, steps_preprocess, between=True, SS=True)
 
 
 #############################################################
@@ -387,8 +383,5 @@ def SS_RG_Within():
     steps_preprocess = {"filter": [8, 30],  # filter from 8-30Hz
                         "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
                         "tmin": 0.5, "tmax": 4, "overlap": 1 / 16, "length": 1,
-                        "score": "EAcc"}
-    accuracy = test_pipeline(dic_data_test, pipelines, target, steps_preprocess, dic_data_train,
-                             within=True, SS=True)
-
-    return accuracy
+                        "score": "LIME"}
+    test_pipeline(dic_data_test, pipelines, target, steps_preprocess, dic_data_train, within=True, SS=True)
