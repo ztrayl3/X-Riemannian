@@ -293,9 +293,7 @@ def test_pipeline(test, pipelines, session, steps_preprocess, train=None,
                 pipelines[classifier].fit(newTrain, Y_train)
 
                 print("Calculating LIME values...")
-                channels = ['Fz', 'FCz', 'Cz', 'CPz', 'Pz', 'C1', 'C3', 'C5', 'C2', 'C4',
-                            'C6', 'F4', 'FC2', 'FC4', 'FC6', 'CP2', 'CP4', 'CP6', 'P4',
-                            'F3', 'FC1', 'FC3', 'FC5', 'CP1', 'CP3', 'CP5', 'P3']
+                global channels  # grab our global channel names
                 global sfreq  # grab our global sampling frequency
                 explainer = lime_tabular.RecurrentTabularExplainer(newTrain, training_labels=Y_train,
                                                                    feature_names=channels,
@@ -425,6 +423,8 @@ def load_MS(between=False, within=False):
 
             global sfreq
             sfreq = sub_data[0].info["sfreq"]  # save the sampling frequency for later
+            global channels  # save the channel names for later
+            channels = [sub_data[0].info["ch_names"][i] for i in mne.pick_types(sub_data[0].info, eeg=True)]
             data[sub] = sub_data  # save sub_data list into data dictionary
 
     # Current data format: data[subject] holds all 8 raw objects
@@ -503,6 +503,8 @@ def load_SS(between=False, within=False):
 
             global sfreq
             sfreq = sub_data[0].info["sfreq"]  # save the sampling frequency for later
+            global channels  # save the channel names for later
+            channels = [sub_data[0].info["ch_names"][i] for i in mne.pick_types(sub_data[0].info, eeg=True)]
             data[sub][sess] = sub_data  # save sub_data list into data dictionary
 
     # Current data format: data[subject][session] holds all 30 raw objects for a given subject's session

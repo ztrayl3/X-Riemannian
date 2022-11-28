@@ -21,9 +21,9 @@ batch_size = 32
 
 # dictionary for all our testing pipelines
 pipelines = {}
-pipelines['8csp+lda'] = make_pipeline(LIMEd(test=True),
-                                      CSP(n_components=8),
-                                      LDA())  # baseline comparison CSP+LDA
+#pipelines['8csp+lda'] = make_pipeline(LIMEd(test=True),
+#                                      CSP(n_components=8),
+#                                      LDA())  # baseline comparison CSP+LDA
 pipelines['MDM'] = make_pipeline(LIMEd(test=True),
                                  Covariances(estimator='lwf'),
                                  MDM(metric='riemann', n_jobs=-1))  # simple Riemannian
