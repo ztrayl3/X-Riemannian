@@ -6,13 +6,17 @@ from tqdm import tqdm
 from numpy.random import seed
 from lime import lime_tabular
 from tensorflow import one_hot
+from keras.models import load_model
 from tensorflow.keras.utils import Sequence
+from EEGModels import ShallowConvNet, square, log
 from tensorflow.keras.utils import set_random_seed
+from tensorflow.keras.metrics import BinaryAccuracy
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard
+
 mne.set_log_level(verbose="Warning")  # set all the mne verbose to warning
 
 seed(2002012)
 set_random_seed(2002012)
-sfreq = 0
 
 
 class LIMEd():
@@ -376,6 +380,141 @@ def test_pipeline(test, pipelines, session, steps_preprocess, train=None,
         path = "Stats/"
         filename = path + subject + ".csv"
         out.to_csv(filename)
+
+
+def test_pipeline_DL(data, dic_data_train, steps_preprocess, dic_data_test=None,
+                     between=False, within=False, MS=False, SS=False):
+    input_window_samples = 1024
+    n_epochs = 500
+    n_classes = 2
+    batch_size = 32
+    global channels
+
+    my_callbacks = [
+        EarlyStopping(patience=50, monitor="loss"),
+        ModelCheckpoint(filepath='Model/best.h5', save_best_only=True)
+    ]
+
+    subjects = list(data.keys())  # a list of participants to be used for analysis
+    subs = [subjects[subject] for subject in range(len(subjects))]
+    accuracy = pd.DataFrame(np.zeros((1, len(subs))))
+
+    for subject in (range(len(subjects))):  # for each subject
+        ID = subjects[subject]  # get string ID
+        if MS:
+            if between:
+                print("Running a leave-one-out classification, leaving out {}".format(ID))  # for progress tracking
+                train_id = subjects.copy()  # train on all
+                test_id = train_id.pop(subject)  # except for one (leave one out)
+
+                key_train_valid = create_key_MS(train_id, train=1, test=1)
+                key_test = create_key_MS([test_id], train=0, test=1)
+
+                mask = np.array([True, True, True, True, False, False] * int(key_train_valid.shape[0]/6))
+                np.random.shuffle(mask)
+                key_train = key_train_valid[mask]
+                key_valid = key_train_valid[~mask]
+
+                X_train, Y_train = epoching(dic_data_train, key_train, steps_preprocess, DL=True)
+                X_valid, Y_valid = epoching(dic_data_train, key_valid, steps_preprocess, DL=True)
+                X_test, Y_test = epoching(dic_data_train, key_test, steps_preprocess, DL=True)
+
+            elif within:
+                print("Running a simple train/test set classification with each MS subject"
+                      " trained and tested on their own data. Running subject {}".format(ID))   # for progress tracking
+                key_train_valid = np.array([ID + "_1", ID + "_2"])  # grab the subject's training data
+                key_test = np.array([ID + "_3", ID + "_4", ID + "_5", ID + "_6"])  # grab the subject's test data
+
+                mask = np.array([True, False])  # only a length of 2 because we only have 2 training/validation files
+                np.random.shuffle(mask)
+                key_train = key_train_valid[mask]
+                key_valid = key_train_valid[~mask]
+
+                X_train, Y_train = epoching(dic_data_train, key_train, steps_preprocess, DL=True)
+                X_valid, Y_valid = epoching(dic_data_train, key_valid, steps_preprocess, DL=True)
+                X_test, Y_test = epoching(dic_data_test, key_test, steps_preprocess, DL=True)
+
+            train_gen = DataGenerator(X_train, Y_train, 64)
+            valid_gen = DataGenerator(X_valid, Y_valid, 64)
+            test_gen = DataGenerator(X_test, Y_test, 64)
+
+            model = ShallowConvNet(nb_classes=n_classes, Chans=len(channels), Samples=input_window_samples)
+            model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=BinaryAccuracy())
+
+            model.fit(x=train_gen,
+                      batch_size=batch_size,
+                      epochs=n_epochs,
+                      callbacks=my_callbacks,
+                      validation_data=valid_gen,
+                      verbose=1)
+
+            model = load_model("Model/best.h5", custom_objects={"square": square, "log": log})
+
+            accuracy[ID] = model.evaluate(x=test_gen)[1]
+        elif SS:
+            subset = {k: v for k, v in dic_data_train.items() if ID in k}  # subset to just the subject of interest
+            sessions = ["S1", "S2", "S3"]
+            for session in sessions:  # for each session
+                if between:
+                    print("Running a leave-one-out classification grouped by subject_session, leaving out {0} session {1}".format(ID, session))
+                    ID = subjects[subject] + "_" + session
+                    train_key = {k: v for k, v in subset.items() if
+                                 session not in k}  # train w/all sessions EXCEPT one (2)
+                    test_key = {k: v for k, v in subset.items() if session in k}  # test on that session (1)
+
+                    key_train_valid = np.array(list(train_key.keys()))  # convert to numpy array
+                    key_test = np.array(list(test_key.keys()))
+
+                    mask = np.array([True, True, True, True, True, True,
+                                     True, True, True, True, True, True,
+                                     True, True, True, True, True, True,
+                                     False, False, False, False, False, False] * int(key_train_valid.shape[0] / 24))
+                    np.random.shuffle(mask)
+                    key_train = key_train_valid[mask]
+                    key_valid = key_train_valid[~mask]
+
+                    X_train, Y_train = epoching(dic_data_train, key_train, steps_preprocess, DL=True)
+                    X_valid, Y_valid = epoching(dic_data_train, key_valid, steps_preprocess, DL=True)
+                    X_test, Y_test = epoching(dic_data_train, key_test, steps_preprocess, DL=True)
+
+                elif within:
+                    print("Running a simple train/test set classification with each SS subject_session"
+                          " trained and tested on their own data. Running subject {0} session {1}".format(ID, session))
+                    ID = subjects[subject] + "_" + session
+
+                    key_train_valid = np.array([ID + "_1", ID + "_2", ID + "_3", ID + "_4"])  # grab the subject's training data
+                    key_test = np.array([ID + "_5", ID + "_6", ID + "_7", ID + "_8",
+                                         ID + "_9", ID + "_10", ID + "_11", ID + "_12"])  # grab the subject's test data
+
+                    mask = np.array([True, True, True, False])
+                    np.random.shuffle(mask)
+                    key_train = key_train_valid[mask]
+                    key_valid = key_train_valid[~mask]
+
+                    X_train, Y_train = epoching(dic_data_train, key_train, steps_preprocess, DL=True)
+                    X_valid, Y_valid = epoching(dic_data_train, key_valid, steps_preprocess, DL=True)
+                    X_test, Y_test = epoching(dic_data_test, key_test, steps_preprocess, DL=True)
+
+                train_gen = DataGenerator(X_train, Y_train, 64)
+                valid_gen = DataGenerator(X_valid, Y_valid, 64)
+                test_gen = DataGenerator(X_test, Y_test, 64)
+
+                model = ShallowConvNet(nb_classes=n_classes, Chans=len(channels), Samples=input_window_samples)
+                model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=BinaryAccuracy())
+
+                model.fit(x=train_gen,
+                          batch_size=batch_size,
+                          epochs=n_epochs,
+                          callbacks=my_callbacks,
+                          validation_data=valid_gen,
+                          verbose=1)
+
+                model = load_model("Model/best.h5", custom_objects={"square": square, "log": log})
+
+                accuracy[ID] = model.evaluate(x=test_gen)[1]
+                # format: performance[subject] = accuracy of within-subject classification
+
+    return accuracy
 
 
 def load_MS(between=False, within=False):
