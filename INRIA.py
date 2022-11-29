@@ -7,6 +7,7 @@ from numpy.random import seed
 from lime import lime_tabular
 from tensorflow import one_hot
 from keras.models import load_model
+from sklearn.pipeline import make_pipeline
 from tensorflow.keras.utils import Sequence
 from EEGModels import ShallowConvNet, square, log
 from tensorflow.keras.utils import set_random_seed
@@ -24,14 +25,45 @@ class LIMEd():
     This is a dummy pipeline step. Its sole purpose is to take LIME formatted data (n_samples, n_timesteps, n_features)
     and turn it back into MNE formatted data (epochs, features, samples).
     """
-    def __init__(self, test):
-        self.test = test
+    def __init__(self, DL=False):
+        self.DL = DL
 
     def fit(self, X, y=None, **fit_params):
         return self
 
     def transform(self, X):
+        if self.DL:  # perform DL specific transpose
+            X.x = LIME_format(X.x)
+            return X
         return LIME_format(X)
+
+
+class LIMEdl():
+    """
+    This is a dummy pipeline step. Its sole purpose is to fit the functions for a neural network into an SKlearn
+    pipeline. Note that this can be done with KerasRegressor as well, but this is simpler for my simpler needs.
+    """
+    def __init__(self, channels, valid_gen):
+        self.model = ShallowConvNet(nb_classes=2, Chans=channels, Samples=1024)
+        self.model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=BinaryAccuracy())
+        self.batch_size = 32
+        self.n_epochs = 500
+        self.callbacks = [EarlyStopping(patience=50, monitor="loss"),
+                          ModelCheckpoint(filepath='Model/best.h5', save_best_only=True)]
+        self.valid_gen = valid_gen
+
+    def fit(self, X, y=None, **fit_params):
+        self.model.fit(x=X,
+                       batch_size=self.batch_size,
+                       epochs=self.n_epochs,
+                       callbacks=self.callbacks,
+                       validation_data=self.valid_gen,
+                       verbose=1)
+        return self.model
+
+    def predict(self, X):
+        self.model = load_model("Model/best.h5", custom_objects={"square": square, "log": log})
+        return self.model.evaluate(x=X)[1]
 
 
 def LIME_format(input):
@@ -401,6 +433,7 @@ def test_pipeline_DL(data, dic_data_train, steps_preprocess, dic_data_test=None,
 
     for subject in (range(len(subjects))):  # for each subject
         ID = subjects[subject]  # get string ID
+        print("Targeting subject {}".format(ID))
         if MS:
             if between:
                 print("Running a leave-one-out classification, leaving out {}".format(ID))  # for progress tracking
@@ -438,25 +471,21 @@ def test_pipeline_DL(data, dic_data_train, steps_preprocess, dic_data_test=None,
             valid_gen = DataGenerator(X_valid, Y_valid, 64)
             test_gen = DataGenerator(X_test, Y_test, 64)
 
-            model = ShallowConvNet(nb_classes=n_classes, Chans=len(channels), Samples=input_window_samples)
-            model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=BinaryAccuracy())
+            pipelineDL = make_pipeline(LIMEd(DL=True),
+                                       LIMEdl(channels=len(channels), valid_gen=valid_gen))
 
-            model.fit(x=train_gen,
-                      batch_size=batch_size,
-                      epochs=n_epochs,
-                      callbacks=my_callbacks,
-                      validation_data=valid_gen,
-                      verbose=1)
+            # fit must get LIMEd data, since it will automatically un-lime it (valid_gen doesn't need this)
+            train_gen.x = LIME_format(train_gen.x)
+            test_gen.x = LIME_format(test_gen.x)
 
-            model = load_model("Model/best.h5", custom_objects={"square": square, "log": log})
-
-            accuracy[ID] = model.evaluate(x=test_gen)[1]
+            pipelineDL.fit(train_gen)
+            accuracy[ID] = pipelineDL.predict(test_gen)
         elif SS:
             subset = {k: v for k, v in dic_data_train.items() if ID in k}  # subset to just the subject of interest
             sessions = ["S1", "S2", "S3"]
             for session in sessions:  # for each session
                 if between:
-                    print("Running a leave-one-out classification grouped by subject_session, leaving out {0} session {1}".format(ID, session))
+                    print("Running a leave-one-out classification grouped by subject, leaving out {0} session {1}".format(ID, session))
                     ID = subjects[subject] + "_" + session
                     train_key = {k: v for k, v in subset.items() if
                                  session not in k}  # train w/all sessions EXCEPT one (2)
@@ -499,20 +528,15 @@ def test_pipeline_DL(data, dic_data_train, steps_preprocess, dic_data_test=None,
                 valid_gen = DataGenerator(X_valid, Y_valid, 64)
                 test_gen = DataGenerator(X_test, Y_test, 64)
 
-                model = ShallowConvNet(nb_classes=n_classes, Chans=len(channels), Samples=input_window_samples)
-                model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=BinaryAccuracy())
+                pipelineDL = make_pipeline(LIMEd(DL=True),
+                                           LIMEdl(channels=len(channels), valid_gen=valid_gen))
 
-                model.fit(x=train_gen,
-                          batch_size=batch_size,
-                          epochs=n_epochs,
-                          callbacks=my_callbacks,
-                          validation_data=valid_gen,
-                          verbose=1)
+                # fit must get LIMEd data, since it will automatically un-lime it (valid_gen doesn't need this)
+                train_gen.x = LIME_format(train_gen.x)
+                test_gen.x = LIME_format(test_gen.x)
 
-                model = load_model("Model/best.h5", custom_objects={"square": square, "log": log})
-
-                accuracy[ID] = model.evaluate(x=test_gen)[1]
-                # format: performance[subject] = accuracy of within-subject classification
+                pipelineDL.fit(train_gen)
+                accuracy[ID] = pipelineDL.predict(test_gen)
 
     return accuracy
 

@@ -15,13 +15,13 @@ batch_size = 32
 
 # dictionary for all our testing pipelines
 pipelines = {}
-#pipelines['8csp+lda'] = make_pipeline(LIMEd(test=True),
+#pipelines['8csp+lda'] = make_pipeline(LIMEd(DL=False),
 #                                      CSP(n_components=8),
 #                                      LDA())  # baseline comparison CSP+LDA
-pipelines['MDM'] = make_pipeline(LIMEd(test=True),
+pipelines['MDM'] = make_pipeline(LIMEd(DL=False),
                                  Covariances(estimator='lwf'),
                                  MDM(metric='riemann', n_jobs=-1))  # simple Riemannian
-pipelines['tangentspace+LR'] = make_pipeline(LIMEd(test=True),
+pipelines['tangentspace+LR'] = make_pipeline(LIMEd(DL=False),
                                              Covariances(estimator='lwf'),
                                              TangentSpace(metric='riemann'),
                                              LogisticRegression(max_iter=350, n_jobs=-1))  # more realistic Riemannian
