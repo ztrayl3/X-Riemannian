@@ -15,7 +15,6 @@ from tensorflow.keras.metrics import BinaryAccuracy
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard
 
 mne.set_log_level(verbose="Warning")  # set all the mne verbose to warning
-
 seed(2002012)
 set_random_seed(2002012)
 
@@ -54,6 +53,7 @@ class LIMEdl():
 
     def fit(self, X, y=None, **fit_params):
         self.model.fit(x=X,
+                       y=y,
                        batch_size=self.batch_size,
                        epochs=self.n_epochs,
                        callbacks=self.callbacks,
@@ -63,12 +63,89 @@ class LIMEdl():
 
     def predict(self, X):
         self.model = load_model("Model/best.h5", custom_objects={"square": square, "log": log})
-        return self.model.evaluate(x=X)[1]
+        return self.model.predict(x=X)
 
 
 def LIME_format(input):
     # reformat data into (n_samples, n_timesteps, n_features)
     return input.transpose(0, 2, 1)
+
+
+def LIME_calc(Xtrain, Ytrain, Xtest, labels, predictor, sfreq):
+    print("Calculating LIME values...")
+    explainer = lime_tabular.RecurrentTabularExplainer(Xtrain, training_labels=Ytrain,
+                                                       feature_names=labels,
+                                                       discretize_continuous=False,
+                                                       class_names=['Left', 'Right'])
+    """
+                                                         mimics    [   0       1   ]
+    """
+
+    first = True
+    LIMEans = dict(Left={}, Right={})  # dictionary for predictions of both possible classes
+    # for instance in tqdm(range(len(Xtest))):  # for each epoch...
+    for instance in tqdm(range(50)):  # for DEBUGGING
+        for i in range(0, 2):  # explain for one class at a time
+            sample = Xtest[instance]
+            exp = explainer.explain_instance(sample, predictor,
+                                             num_features=int(len(channels) * sfreq),
+                                             num_samples=1000,
+                                             labels=(i,))  # choose the correct class
+
+            if first:  # only create dictionary once
+                # for each Channel_t-timestamp, give them an empty list in a dict
+                LIMEans["Left"] = {feature: [] for feature in exp.domain_mapper.feature_names}
+                LIMEans["Right"] = {feature: [] for feature in exp.domain_mapper.feature_names}
+                first = False
+
+            for feature in exp.local_exp[i]:  # for each Channel_t-timestamp's contribution
+                index = feature[0]
+                val = feature[1]
+                if i == 0:
+                    LIMEans["Left"][exp.domain_mapper.feature_names[index]].append(val)  # save it in the dict
+                elif i == 1:
+                    LIMEans["Right"][exp.domain_mapper.feature_names[index]].append(val)  # save it in the dict
+
+    print("Averaging LIME values...")
+    for feature in exp.domain_mapper.feature_names:  # for each Channel_t-timestamp...
+        # calculate the average contribution for each feature (and class)
+        LIMEans["Left"][feature] = np.mean(LIMEans["Left"][feature])
+        LIMEans["Right"][feature] = np.mean(LIMEans["Right"][feature])
+
+    return LIMEans
+
+
+def LIME_output(data):
+    # create dataframe for storage
+    classes = ["left", "right"]
+    colnames = ["Classifier", "Predicted", "Channel", "Time", "Weight"]
+    df = []
+    for LIME in data:  # load each LIME dictionary from our results array
+        # grab relevant information
+        subject = LIME["subject"]  # string
+        classifier = LIME["classifier"]  # string
+        LEFT = LIME["value"]["Left"]  # dictionary {string: float}
+        RIGHT = LIME["value"]["Right"]  # dictionary {string: float}
+
+        for i in classes:  # for left / right predictions...
+            for j in LEFT.keys():  # for each channel-step
+                key = j
+                if i == "left":
+                    value = LEFT[j]
+                if i == "right":
+                    value = RIGHT[j]
+
+                channel = key.split("-")[0][:-2]  # grab channel name, remove "_t" from end (string, 10-20 system)
+                time = key.split("-")[1]  # grab timestamp (int, 0-511 or 0-255 depending on sampling rate)
+                weight = value  # grab values
+
+                row = [classifier, i, channel, time, weight]
+                df.append(row)
+
+    out = pd.DataFrame(df, columns=colnames)
+    path = "Stats/"
+    filename = path + subject + ".csv"
+    out.to_csv(filename)
 
 
 def create_key_MS(df, train=1, test=1):  # Create an array of keys to indicate train/test datasets
@@ -209,6 +286,7 @@ class DataGenerator(Sequence):
     def __init__(self, x_set, y_set, batch_size):
         self.x, self.y = x_set, y_set
         self.batch_size = batch_size
+        self.shape = self.x.shape
 
     def __len__(self):
         return int(np.ceil(len(self.x) / float(self.batch_size)))
@@ -328,112 +406,33 @@ def test_pipeline(test, pipelines, session, steps_preprocess, train=None,
                 # fit must get LIMEd data, since it will automatically un-lime it during training
                 pipelines[classifier].fit(newTrain, Y_train)
 
-                print("Calculating LIME values...")
                 global channels  # grab our global channel names
                 global sfreq  # grab our global sampling frequency
-                explainer = lime_tabular.RecurrentTabularExplainer(newTrain, training_labels=Y_train,
-                                                                   feature_names=channels,
-                                                                   discretize_continuous=False,
-                                                                   class_names=['Left', 'Right'])
-                """
-                                                                     mimics    [   0       1   ]
-                """
-
-                first = True
-                LIMEans = dict(Left={}, Right={})  # dictionary for predictions of both possible classes
-                #for instance in tqdm(range(len(newTest))):  # for each epoch...
-                for instance in tqdm(range(50)):  # for DEBUGGING
-                    for i in range(0, 2):  # explain for one class at a time
-                        sample = newTest[instance]
-                        exp = explainer.explain_instance(sample, pipelines[classifier].predict_proba,
-                                                         num_features=int(len(channels) * sfreq),
-                                                         num_samples=1000,
-                                                         labels=(i,))  # choose the correct class
-
-                        if first:  # only create dictionary once
-                            # for each Channel_t-timestamp, give them an empty list in a dict
-                            LIMEans["Left"] = {feature: [] for feature in exp.domain_mapper.feature_names}
-                            LIMEans["Right"] = {feature: [] for feature in exp.domain_mapper.feature_names}
-                            first = False
-
-                        for feature in exp.local_exp[i]:  # for each Channel_t-timestamp's contribution
-                            index = feature[0]
-                            val = feature[1]
-                            if i == 0:
-                                LIMEans["Left"][exp.domain_mapper.feature_names[index]].append(val)  # save it in the dict
-                            elif i == 1:
-                                LIMEans["Right"][exp.domain_mapper.feature_names[index]].append(val)  # save it in the dict
-
-                print("Averaging LIME values...")
-                for feature in exp.domain_mapper.feature_names:  # for each Channel_t-timestamp...
-                    # calculate the average contribution for each feature (and class)
-                    LIMEans["Left"][feature] = np.mean(LIMEans["Left"][feature])
-                    LIMEans["Right"][feature] = np.mean(LIMEans["Right"][feature])
 
                 accuracy.append(
                     dict(
                         subject=subject,
                         classifier=classifier,
-                        value=LIMEans
+                        value=LIME_calc(newTrain, Y_train, newTest, channels,
+                                        pipelines[classifier].predict_proba, sfreq)
                     )
                 )
             else:
                 raise AttributeError("The chosen score does not exist!")
 
-        # now that we have completed 1 subject, save their data to a csv file
-
-        # create dataframe for storage
-        classes = ["left", "right"]
-        colnames = ["Classifier", "Predicted", "Channel", "Time", "Weight"]
-        df = []
-        for LIME in accuracy:  # load each LIME dictionary from our results array
-            # grab relevant information
-            subject = LIME["subject"]  # string
-            classifier = LIME["classifier"]  # string
-            LEFT = LIME["value"]["Left"]  # dictionary {string: float}
-            RIGHT = LIME["value"]["Right"]  # dictionary {string: float}
-
-            for i in classes:  # for left / right predictions...
-                for j in LEFT.keys():  # for each channel-step
-                    key = j
-                    if i == "left":
-                        value = LEFT[j]
-                    if i == "right":
-                        value = RIGHT[j]
-
-                    channel = key.split("-")[0][:-2]  # grab channel name, remove "_t" from end (string, 10-20 system)
-                    time = key.split("-")[1]  # grab timestamp (int, 0-511 or 0-255 depending on sampling rate)
-                    weight = value  # grab values
-
-                    row = [classifier, i, channel, time, weight]
-                    df.append(row)
-
-        out = pd.DataFrame(df, columns=colnames)
-        path = "Stats/"
-        filename = path + subject + ".csv"
-        out.to_csv(filename)
+        # now that we have completed 1 subject (3 classifiers), save their data to a csv file
+        LIME_output(accuracy)
 
 
 def test_pipeline_DL(data, dic_data_train, steps_preprocess, dic_data_test=None,
                      between=False, within=False, MS=False, SS=False):
-    input_window_samples = 1024
-    n_epochs = 500
-    n_classes = 2
-    batch_size = 32
     global channels
-
-    my_callbacks = [
-        EarlyStopping(patience=50, monitor="loss"),
-        ModelCheckpoint(filepath='Model/best.h5', save_best_only=True)
-    ]
-
     subjects = list(data.keys())  # a list of participants to be used for analysis
-    subs = [subjects[subject] for subject in range(len(subjects))]
-    accuracy = pd.DataFrame(np.zeros((1, len(subs))))
 
     for subject in (range(len(subjects))):  # for each subject
         ID = subjects[subject]  # get string ID
         print("Targeting subject {}".format(ID))
+        accuracy = []  # reset the results array for each subject to keep files from concatenating
         if MS:
             if between:
                 print("Running a leave-one-out classification, leaving out {}".format(ID))  # for progress tracking
@@ -471,21 +470,31 @@ def test_pipeline_DL(data, dic_data_train, steps_preprocess, dic_data_test=None,
             valid_gen = DataGenerator(X_valid, Y_valid, 64)
             test_gen = DataGenerator(X_test, Y_test, 64)
 
-            pipelineDL = make_pipeline(LIMEd(DL=True),
+            pipelineDL = make_pipeline(LIMEd(DL=False),
                                        LIMEdl(channels=len(channels), valid_gen=valid_gen))
 
             # fit must get LIMEd data, since it will automatically un-lime it (valid_gen doesn't need this)
             train_gen.x = LIME_format(train_gen.x)
             test_gen.x = LIME_format(test_gen.x)
 
-            pipelineDL.fit(train_gen)
-            accuracy[ID] = pipelineDL.predict(test_gen)
+            pipelineDL.fit(train_gen.x, y=train_gen.y)
+            accuracy.append(
+                dict(
+                    subject=ID,
+                    classifier="ShallowConvNet",
+                    value=LIME_calc(train_gen.x, train_gen.y, test_gen.x, channels,
+                                    pipelineDL.predict, sfreq)
+                )
+            )
+
+            # now that we've completed one subject of MS DL, save results
+            LIME_output(accuracy)
         elif SS:
             subset = {k: v for k, v in dic_data_train.items() if ID in k}  # subset to just the subject of interest
             sessions = ["S1", "S2", "S3"]
             for session in sessions:  # for each session
                 if between:
-                    print("Running a leave-one-out classification grouped by subject, leaving out {0} session {1}".format(ID, session))
+                    print("Running a leave-one-out classification grouped by subject, leaving out {0} session {1}".format(subjects[subject], session))
                     ID = subjects[subject] + "_" + session
                     train_key = {k: v for k, v in subset.items() if
                                  session not in k}  # train w/all sessions EXCEPT one (2)
@@ -508,7 +517,7 @@ def test_pipeline_DL(data, dic_data_train, steps_preprocess, dic_data_test=None,
 
                 elif within:
                     print("Running a simple train/test set classification with each SS subject_session"
-                          " trained and tested on their own data. Running subject {0} session {1}".format(ID, session))
+                          " trained and tested on their own data. Running subject {0} session {1}".format(subjects[subject], session))
                     ID = subjects[subject] + "_" + session
 
                     key_train_valid = np.array([ID + "_1", ID + "_2", ID + "_3", ID + "_4"])  # grab the subject's training data
@@ -528,17 +537,25 @@ def test_pipeline_DL(data, dic_data_train, steps_preprocess, dic_data_test=None,
                 valid_gen = DataGenerator(X_valid, Y_valid, 64)
                 test_gen = DataGenerator(X_test, Y_test, 64)
 
-                pipelineDL = make_pipeline(LIMEd(DL=True),
+                pipelineDL = make_pipeline(LIMEd(DL=False),
                                            LIMEdl(channels=len(channels), valid_gen=valid_gen))
 
                 # fit must get LIMEd data, since it will automatically un-lime it (valid_gen doesn't need this)
                 train_gen.x = LIME_format(train_gen.x)
                 test_gen.x = LIME_format(test_gen.x)
 
-                pipelineDL.fit(train_gen)
-                accuracy[ID] = pipelineDL.predict(test_gen)
+                pipelineDL.fit(train_gen.x, y=train_gen.y)
+                accuracy.append(
+                    dict(
+                        subject=subjects[subject],
+                        classifier=session,
+                        value=LIME_calc(train_gen.x, train_gen.y, test_gen.x, channels,
+                                        pipelineDL.predict, sfreq)
+                    )
+                )
 
-    return accuracy
+            # now that we've completed one subject of SS DL (i.e. three sessions), save results
+            LIME_output(accuracy)
 
 
 def load_MS(between=False, within=False):

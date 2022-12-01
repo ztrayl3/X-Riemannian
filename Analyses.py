@@ -7,17 +7,11 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
 from INRIA import load_SS, load_MS, test_pipeline_DL, test_pipeline, LIMEd
 
-# Deep learning specific parameters
-input_window_samples = 1024
-n_epochs = 500
-n_classes = 2
-batch_size = 32
-
-# dictionary for all our testing pipelines
+# dictionary for all our Riemannian Geometry testing pipelines
 pipelines = {}
-#pipelines['8csp+lda'] = make_pipeline(LIMEd(DL=False),
-#                                      CSP(n_components=8),
-#                                      LDA())  # baseline comparison CSP+LDA
+pipelines['8csp+lda'] = make_pipeline(LIMEd(DL=False),
+                                      CSP(n_components=8),
+                                      LDA())  # baseline comparison CSP+LDA
 pipelines['MDM'] = make_pipeline(LIMEd(DL=False),
                                  Covariances(estimator='lwf'),
                                  MDM(metric='riemann', n_jobs=-1))  # simple Riemannian
@@ -44,7 +38,7 @@ def MS_DL_Between():
                         "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
                         "tmin": 0.5, "tmax": 2.5, "overlap": 1, "length": 2}
 
-    return test_pipeline_DL(data, dic_data, steps_preprocess, MS=True, between=True)
+    test_pipeline_DL(data, dic_data, steps_preprocess, MS=True, between=True)
 
 
 #############################################################
@@ -61,7 +55,7 @@ def MS_DL_Within():
                         "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
                         "tmin": 0.5, "tmax": 2.5, "overlap": 1, "length": 2}
 
-    return test_pipeline_DL(data, dic_data_train, steps_preprocess, dic_data_test=dic_data_test, MS=True, within=True)
+    test_pipeline_DL(data, dic_data_train, steps_preprocess, dic_data_test=dic_data_test, MS=True, within=True)
 
 #############################################################
 # Analysis   : MS_RG_Between                                #
@@ -123,7 +117,7 @@ def SS_DL_Between():
                         "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
                         "tmin": 0.5, "tmax": 2.5, "overlap": 1, "length": 2}
 
-    return test_pipeline_DL(data, dic_data, steps_preprocess, SS=True, between=True)
+    test_pipeline_DL(data, dic_data, steps_preprocess, SS=True, between=True)
 
 
 #############################################################
@@ -141,7 +135,7 @@ def SS_DL_Within():
                         "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
                         "tmin": 0.5, "tmax": 2.5, "overlap": 1, "length": 2}
 
-    return test_pipeline_DL(data, dic_data_train, steps_preprocess, dic_data_test=dic_data_test, SS=True, within=True)
+    test_pipeline_DL(data, dic_data_train, steps_preprocess, dic_data_test=dic_data_test, SS=True, within=True)
 
 
 #############################################################
