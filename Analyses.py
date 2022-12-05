@@ -9,9 +9,9 @@ from INRIA import load_SS, load_MS, test_pipeline_DL, test_pipeline, LIMEd
 
 # dictionary for all our Riemannian Geometry testing pipelines
 pipelines = {}
-pipelines['8csp+lda'] = make_pipeline(LIMEd(DL=False),
-                                      CSP(n_components=8),
-                                      LDA())  # baseline comparison CSP+LDA
+#pipelines['8csp+lda'] = make_pipeline(LIMEd(DL=False),
+#                                      CSP(n_components=8),
+#                                      LDA())  # baseline comparison CSP+LDA
 pipelines['MDM'] = make_pipeline(LIMEd(DL=False),
                                  Covariances(estimator='lwf'),
                                  MDM(metric='riemann', n_jobs=-1))  # simple Riemannian
@@ -22,6 +22,8 @@ pipelines['tangentspace+LR'] = make_pipeline(LIMEd(DL=False),
 
 # session IDs for the single subject dataset
 sessions = ["S1", "S2", "S3"]
+# RG subs should be strings formatted like "A10" for MS and "S06_S1" for SS
+# DL subs should be strings formatted like "A10" for MS and "S06" for SS
 
 #############################################################
 # Analysis   : MS_DL_Between                                #
@@ -31,14 +33,14 @@ sessions = ["S1", "S2", "S3"]
 #############################################################
 
 
-def MS_DL_Between():
+def MS_DL_Between(subs):
     data, dic_data = load_MS(between=True)  # load multi-subject dataset for between subject analysis
 
     steps_preprocess = {"filter": [8, 30],  # filter from 8-30Hz
                         "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
                         "tmin": 0.5, "tmax": 2.5, "overlap": 1, "length": 2}
 
-    test_pipeline_DL(data, dic_data, steps_preprocess, MS=True, between=True)
+    test_pipeline_DL(data, dic_data, steps_preprocess, MS=True, between=True, subs=subs)
 
 
 #############################################################
@@ -48,14 +50,14 @@ def MS_DL_Between():
 # Condition  : Within Subject Performance (train/test set)  #
 #############################################################
 
-def MS_DL_Within():
+def MS_DL_Within(subs):
     data, dic_data_train, dic_data_test = load_MS(within=True)  # load multi-subject dataset for within subject analysis
 
     steps_preprocess = {"filter": [8, 30],  # filter from 8-30Hz
                         "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
                         "tmin": 0.5, "tmax": 2.5, "overlap": 1, "length": 2}
 
-    test_pipeline_DL(data, dic_data_train, steps_preprocess, dic_data_test=dic_data_test, MS=True, within=True)
+    test_pipeline_DL(data, dic_data_train, steps_preprocess, dic_data_test=dic_data_test, MS=True, within=True, subs=subs)
 
 #############################################################
 # Analysis   : MS_RG_Between                                #
@@ -65,7 +67,7 @@ def MS_DL_Within():
 #############################################################
 
 
-def MS_RG_Between():
+def MS_RG_Between(subs):
     # load the MS dataset
     data, dic_data = load_MS(between=True)
 
@@ -75,7 +77,7 @@ def MS_RG_Between():
                         "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
                         "tmin": 0.5, "tmax": 4, "overlap": 1/16, "length": 1,
                         "score": "LIME"}
-    test_pipeline(dic_data, pipelines, session, steps_preprocess, between=True, MS=True)  # run it!
+    test_pipeline(dic_data, pipelines, session, steps_preprocess, between=True, MS=True, subs=subs)  # run it!
 
 
 #############################################################
@@ -86,7 +88,7 @@ def MS_RG_Between():
 #############################################################
 
 
-def MS_RG_Within():
+def MS_RG_Within(subs):
     # load the MS dataset
     data, dic_data_train, dic_data_test = load_MS(within=True)
 
@@ -96,7 +98,7 @@ def MS_RG_Within():
                         "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
                         "tmin": 0.5, "tmax": 4, "overlap": 1/16, "length": 1,
                         "score": "LIME"}
-    test_pipeline(dic_data_test, pipelines, session, steps_preprocess, dic_data_train, within=True, MS=True)
+    test_pipeline(dic_data_test, pipelines, session, steps_preprocess, dic_data_train, within=True, MS=True, subs=subs)
 
 
 ########################################################################################################################
@@ -110,14 +112,14 @@ def MS_RG_Within():
 #############################################################
 
 
-def SS_DL_Between():
+def SS_DL_Between(subs):
     data, dic_data = load_SS(between=True)  # load multi-subject dataset for between subject analysis
 
     steps_preprocess = {"filter": [8, 30],  # filter from 8-30Hz
                         "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
                         "tmin": 0.5, "tmax": 2.5, "overlap": 1, "length": 2}
 
-    test_pipeline_DL(data, dic_data, steps_preprocess, SS=True, between=True)
+    test_pipeline_DL(data, dic_data, steps_preprocess, SS=True, between=True, subs=subs)
 
 
 #############################################################
@@ -128,14 +130,14 @@ def SS_DL_Between():
 #############################################################
 
 
-def SS_DL_Within():
+def SS_DL_Within(subs):
     data, dic_data_train, dic_data_test = load_SS(within=True)  # load single-subject dataset for within subject analysis
 
     steps_preprocess = {"filter": [8, 30],  # filter from 8-30Hz
                         "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
                         "tmin": 0.5, "tmax": 2.5, "overlap": 1, "length": 2}
 
-    test_pipeline_DL(data, dic_data_train, steps_preprocess, dic_data_test=dic_data_test, SS=True, within=True)
+    test_pipeline_DL(data, dic_data_train, steps_preprocess, dic_data_test=dic_data_test, SS=True, within=True, subs=subs)
 
 
 #############################################################
@@ -146,7 +148,7 @@ def SS_DL_Within():
 #############################################################
 
 
-def SS_RG_Between():
+def SS_RG_Between(subs):
     # load the SS dataset
     data, dic_data = load_SS(between=True)
     subjects = list(data.keys())  # a list of participants to be used for analysis
@@ -159,7 +161,7 @@ def SS_RG_Between():
                         "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
                         "tmin": 0.5, "tmax": 4, "overlap": 1 / 16, "length": 1,
                         "score": "LIME"}
-    test_pipeline(dic_data, pipelines, target, steps_preprocess, between=True, SS=True)
+    test_pipeline(dic_data, pipelines, target, steps_preprocess, between=True, SS=True, subs=subs)
 
 
 #############################################################
@@ -170,7 +172,7 @@ def SS_RG_Between():
 #############################################################
 
 
-def SS_RG_Within():
+def SS_RG_Within(subs):
     # load the SS dataset
     data, dic_data_train, dic_data_test = load_SS(within=True)
     subjects = list(data.keys())  # a list of participants to be used for analysis
@@ -183,4 +185,4 @@ def SS_RG_Within():
                         "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
                         "tmin": 0.5, "tmax": 4, "overlap": 1 / 16, "length": 1,
                         "score": "LIME"}
-    test_pipeline(dic_data_test, pipelines, target, steps_preprocess, dic_data_train, within=True, SS=True)
+    test_pipeline(dic_data_test, pipelines, target, steps_preprocess, dic_data_train, within=True, SS=True, subs=subs)

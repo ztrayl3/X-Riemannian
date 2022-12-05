@@ -298,9 +298,15 @@ class DataGenerator(Sequence):
 
 
 def test_pipeline(test, pipelines, session, steps_preprocess, train=None,
-                  between=False, within=False, MS=False, SS=False):
+                  between=False, within=False, MS=False, SS=False, subs=None):
     """ Take in input the different pipelines to test and return the corresponding classification accuracy"""
+
+    if not subs:  # if no subject's provided
+        subs = session  # use all subjects available
+
     for subject in session:  # this will be something like "A10" for MS and "S06_S1" for SS
+        if subject not in subs:  # skip this loop if it's not one of the subjects we want
+            continue
         accuracy = []  # reset the results array for each subject to keep files from concatenating
         if between:  # between subject/session analysis: no train set, just leave-one-out
             if MS:  # using the multi subject dataset
@@ -425,12 +431,17 @@ def test_pipeline(test, pipelines, session, steps_preprocess, train=None,
 
 
 def test_pipeline_DL(data, dic_data_train, steps_preprocess, dic_data_test=None,
-                     between=False, within=False, MS=False, SS=False):
+                     between=False, within=False, MS=False, SS=False, subs=None):
     global channels
     subjects = list(data.keys())  # a list of participants to be used for analysis
 
+    if not subs:  # if no subject's provided
+        subs = subjects  # use all subjects available
+
     for subject in (range(len(subjects))):  # for each subject
         ID = subjects[subject]  # get string ID
+        if ID not in subs:  # skip this loop if it's not one of the subjects we want
+            continue
         print("Targeting subject {}".format(ID))
         accuracy = []  # reset the results array for each subject to keep files from concatenating
         if MS:
