@@ -1,5 +1,6 @@
 import os
 import mne
+import time
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
@@ -65,6 +66,10 @@ class LIMEdl():
         self.model = load_model("Model/best.h5", custom_objects={"square": square, "log": log})
         return self.model.predict(x=X)
 
+    def score(self, X, y=None, sample_weight=None):
+        self.model = load_model("Model/best.h5", custom_objects={"square": square, "log": log})
+        return self.model.evaluate(x=X, y=y)[1]
+
 
 def LIME_format(input):
     # reformat data into (n_samples, n_timesteps, n_features)
@@ -118,12 +123,13 @@ def LIME_calc(Xtrain, Ytrain, Xtest, labels, predictor, sfreq):
 def LIME_output(data):
     # create dataframe for storage
     classes = ["left", "right"]
-    colnames = ["Classifier", "Predicted", "Channel", "Time", "Weight"]
+    colnames = ["Subject", "Info", "Predicted", "Channel", "Time", "Weight", "Accuracy"]
     df = []
     for LIME in data:  # load each LIME dictionary from our results array
         # grab relevant information
         subject = LIME["subject"]  # string
         classifier = LIME["classifier"]  # string
+        acc = LIME["acc"]  # float
         LEFT = LIME["value"]["Left"]  # dictionary {string: float}
         RIGHT = LIME["value"]["Right"]  # dictionary {string: float}
 
@@ -136,15 +142,17 @@ def LIME_output(data):
                     value = RIGHT[j]
 
                 channel = key.split("-")[0][:-2]  # grab channel name, remove "_t" from end (string, 10-20 system)
-                time = key.split("-")[1]  # grab timestamp (int, 0-511 or 0-255 depending on sampling rate)
+                t = key.split("-")[1]  # grab timestamp (int, 0-511 or 0-255 depending on sampling rate)
                 weight = value  # grab values
 
-                row = [classifier, i, channel, time, weight]
+                # ["Subject", "Info", "Predicted", "Channel", "Time", "Weight", "Accuracy"]
+                row = [subject, classifier, i, channel, t, weight, acc]
                 df.append(row)
 
     out = pd.DataFrame(df, columns=colnames)
     path = "Stats/"
-    filename = path + subject + ".csv"
+    # mark file with a timestamp, just to ensure uniqueness in filename
+    filename = path + subject + "_" + str(time.time()).replace(".", "") + ".csv"
     out.to_csv(filename)
 
 
@@ -358,73 +366,22 @@ def test_pipeline(test, pipelines, session, steps_preprocess, train=None,
             newTrain = np.apply_along_axis(scale, 1, LIME_format(X_train.copy()))  # scale the samples, but
             newTest = np.apply_along_axis(scale, 1, LIME_format(X_test.copy()))  # only apply it to the timesteps dim
 
-            if steps_preprocess["score"] == "TAcc":
-                # fit gets un-LIMEd data
-                pipelines[classifier].fit(X_train, Y_train)
+            # fit must get LIMEd data, since it will automatically un-lime it during training
+            pipelines[classifier].fit(newTrain, Y_train)
+            score = pipelines[classifier].score(newTest, Y_test)  # grab classification accuracy
 
-                print("Calculating classifier accuracy...")
-                # ---------------------------------------------
-                tmin = steps_preprocess["tmin"]
-                tmax = steps_preprocess["tmax"]
-                length_epoch = steps_preprocess["length"]
-                overlap = steps_preprocess["overlap"]
-                # ---------------------------------------------
-                dist = len(np.arange(tmin, (tmax + overlap) - length_epoch, overlap))
+            global channels  # grab our global channel names
+            global sfreq  # grab our global sampling frequency
 
-                X_estim = pipelines[classifier].transform(X_test)
-
-                X_estim_reshape = X_estim.reshape((-1, dist))
-                X_sum = X_estim_reshape.sum(axis=0)
-
-                trial_predict = np.where(X_sum < 0, 0, 1)  # if the sum < 0, left. If >0, predict right
-                temporary_accuracy = np.where(trial_predict == Y_test[0::dist - 1], 1, 0)  # Compare predictions with observations
-
-                accuracy.append(
-                    dict(
-                        subject=subject,
-                        classifier=classifier,
-                        value=temporary_accuracy.mean()
-                    )
+            accuracy.append(
+                dict(
+                    subject=subject,
+                    classifier=classifier,
+                    acc=score,
+                    value=LIME_calc(newTrain, Y_train, newTest, channels,
+                                    pipelines[classifier].predict_proba, sfreq)
                 )
-
-            elif steps_preprocess["score"] == "EAcc":
-                # fit gets un-LIMEd data
-                pipelines[classifier].fit(X_train, Y_train)
-
-                print("Calculating classifier accuracy...")
-                try:
-                    accuracy.append(
-                        dict(
-                            subject=subject,
-                            classifier=classifier,
-                            value=pipelines[classifier].score(X_test, Y_test)
-                        )
-                    )
-                except:
-                    accuracy.append(
-                        dict(
-                            subject=subject,
-                            classifier=classifier,
-                            value=np.nan
-                        )
-                    )
-            elif steps_preprocess["score"] == "LIME":
-                # fit must get LIMEd data, since it will automatically un-lime it during training
-                pipelines[classifier].fit(newTrain, Y_train)
-
-                global channels  # grab our global channel names
-                global sfreq  # grab our global sampling frequency
-
-                accuracy.append(
-                    dict(
-                        subject=subject,
-                        classifier=classifier,
-                        value=LIME_calc(newTrain, Y_train, newTest, channels,
-                                        pipelines[classifier].predict_proba, sfreq)
-                    )
-                )
-            else:
-                raise AttributeError("The chosen score does not exist!")
+            )
 
         # now that we have completed 1 subject (3 classifiers), save their data to a csv file
         LIME_output(accuracy)
@@ -489,10 +446,12 @@ def test_pipeline_DL(data, dic_data_train, steps_preprocess, dic_data_test=None,
             test_gen.x = LIME_format(test_gen.x)
 
             pipelineDL.fit(train_gen.x, y=train_gen.y)
+            score = pipelineDL.score(test_gen.x, y=test_gen.y)
             accuracy.append(
                 dict(
                     subject=ID,
-                    classifier="ShallowConvNet",
+                    classifier="MS_DL",
+                    acc=score,
                     value=LIME_calc(train_gen.x, train_gen.y, test_gen.x, channels,
                                     pipelineDL.predict, sfreq)
                 )
@@ -556,10 +515,12 @@ def test_pipeline_DL(data, dic_data_train, steps_preprocess, dic_data_test=None,
                 test_gen.x = LIME_format(test_gen.x)
 
                 pipelineDL.fit(train_gen.x, y=train_gen.y)
+                score = pipelineDL.score(test_gen.x, y=test_gen.y)
                 accuracy.append(
                     dict(
                         subject=subjects[subject],
                         classifier=session,
+                        acc=score,
                         value=LIME_calc(train_gen.x, train_gen.y, test_gen.x, channels,
                                         pipelineDL.predict, sfreq)
                     )

@@ -5,7 +5,7 @@ library(plotly)
 source <- read_csv("A18_MDM.csv", col_types = cols(...1 = col_skip()))
 
 # Look at timeseries importance
-Timewise <- aggregate(source[, 4], list(source$Time), sum)
+Timewise <- aggregate(source[, 5], list(source$Time), sum)
 ggplotly(
   ggplot(Timewise, aes(x=Group.1, y=Weight)) +
     geom_area(fill="#69b3a2", alpha=0.5) +
@@ -15,7 +15,7 @@ ggplotly(
 )
 
 # Look at channel importance
-Channelwise <- aggregate(source[, 4], list(source$Channel), sum)
+Channelwise <- aggregate(source[, 5], list(source$Channel), sum)
 Channelwise <- Channelwise[order(Channelwise$Group.1, decreasing = TRUE),]
 
 ggplotly(
@@ -26,9 +26,9 @@ ggplotly(
 
 # Look at left and right, overlaid
 Timewise.left <- subset(source, source$Predicted == "left")
-Timewise.left <- aggregate(Timewise.left[, 4], list(Timewise.left$Time), sum)
+Timewise.left <- aggregate(Timewise.left[, 5], list(Timewise.left$Time), sum)
 Timewise.right <- subset(source, source$Predicted == "right")
-Timewise.right <- aggregate(Timewise.right[, 4], list(Timewise.right$Time), sum)
+Timewise.right <- aggregate(Timewise.right[, 5], list(Timewise.right$Time), sum)
 
 ggplotly(
   ggplot(Timewise.left, aes(x=Group.1, y=Weight)) +

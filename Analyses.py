@@ -22,8 +22,8 @@ pipelines['tangentspace+LR'] = make_pipeline(LIMEd(DL=False),
 
 # session IDs for the single subject dataset
 sessions = ["S1", "S2", "S3"]
-# RG subs should be strings formatted like "A10" for MS and "S06_S1" for SS
-# DL subs should be strings formatted like "A10" for MS and "S06" for SS
+# All MS subs should be lists of strings formatted like ["A10"]
+# SS subs should be lists of strings, formatted like ["S06"] for DL and ["S06_S1"] for RG
 
 #############################################################
 # Analysis   : MS_DL_Between                                #
@@ -75,8 +75,7 @@ def MS_RG_Between(subs):
     session = list(data.keys())  # a list of participants to be used for analysis
     steps_preprocess = {"filter": [8, 30],  # filter from 8-30Hz
                         "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
-                        "tmin": 0.5, "tmax": 4, "overlap": 1/16, "length": 1,
-                        "score": "LIME"}
+                        "tmin": 0.5, "tmax": 4, "overlap": 1/16, "length": 1}
     test_pipeline(dic_data, pipelines, session, steps_preprocess, between=True, MS=True, subs=subs)  # run it!
 
 
@@ -96,8 +95,7 @@ def MS_RG_Within(subs):
     session = list(data.keys())  # a list of participants to be used for analysis
     steps_preprocess = {"filter": [8, 30],  # filter from 8-30Hz
                         "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
-                        "tmin": 0.5, "tmax": 4, "overlap": 1/16, "length": 1,
-                        "score": "LIME"}
+                        "tmin": 0.5, "tmax": 4, "overlap": 1/16, "length": 1}
     test_pipeline(dic_data_test, pipelines, session, steps_preprocess, dic_data_train, within=True, MS=True, subs=subs)
 
 
@@ -159,8 +157,7 @@ def SS_RG_Between(subs):
 
     steps_preprocess = {"filter": [8, 30],  # filter from 8-30Hz
                         "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
-                        "tmin": 0.5, "tmax": 4, "overlap": 1 / 16, "length": 1,
-                        "score": "LIME"}
+                        "tmin": 0.5, "tmax": 4, "overlap": 1 / 16, "length": 1}
     test_pipeline(dic_data, pipelines, target, steps_preprocess, between=True, SS=True, subs=subs)
 
 
@@ -183,6 +180,5 @@ def SS_RG_Within(subs):
 
     steps_preprocess = {"filter": [8, 30],  # filter from 8-30Hz
                         "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
-                        "tmin": 0.5, "tmax": 4, "overlap": 1 / 16, "length": 1,
-                        "score": "LIME"}
+                        "tmin": 0.5, "tmax": 4, "overlap": 1 / 16, "length": 1}
     test_pipeline(dic_data_test, pipelines, target, steps_preprocess, dic_data_train, within=True, SS=True, subs=subs)
