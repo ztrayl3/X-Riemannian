@@ -123,12 +123,14 @@ def LIME_calc(Xtrain, Ytrain, Xtest, labels, predictor, sfreq):
 def LIME_output(data):
     # create dataframe for storage
     classes = ["left", "right"]
-    colnames = ["Subject", "Info", "Predicted", "Channel", "Time", "Weight", "Accuracy"]
+    colnames = ["Subject", "Session", "Classifier", "Condition", "Predicted", "Accuracy", "Channel", "Time", "Weight"]
     df = []
     for LIME in data:  # load each LIME dictionary from our results array
         # grab relevant information
         subject = LIME["subject"]  # string
+        session = LIME["sess"]  # string
         classifier = LIME["classifier"]  # string
+        condition = LIME["condition"]  # string
         acc = LIME["acc"]  # float
         LEFT = LIME["value"]["Left"]  # dictionary {string: float}
         RIGHT = LIME["value"]["Right"]  # dictionary {string: float}
@@ -145,8 +147,8 @@ def LIME_output(data):
                 t = key.split("-")[1]  # grab timestamp (int, 0-511 or 0-255 depending on sampling rate)
                 weight = value  # grab values
 
-                # ["Subject", "Info", "Predicted", "Channel", "Time", "Weight", "Accuracy"]
-                row = [subject, classifier, i, channel, t, weight, acc]
+                # "Subject", "Session", "Classifier", "Condition", "Predicted", "Accuracy", "Channel", "Time", "Weight"
+                row = [subject, session, classifier, condition, i, acc, channel, t, weight]
                 df.append(row)
 
     out = pd.DataFrame(df, columns=colnames)
@@ -315,6 +317,14 @@ def test_pipeline(test, pipelines, session, steps_preprocess, train=None,
     for subject in session:  # this will be something like "A10" for MS and "S06_S1" for SS
         if subject not in subs:  # skip this loop if it's not one of the subjects we want
             continue
+
+        # variables for eventual output
+        subID = subject
+        label = "NA"
+        if between:
+            cond = "B"  # between subjects
+        else:
+            cond = "W"  # within subjects
         accuracy = []  # reset the results array for each subject to keep files from concatenating
         if between:  # between subject/session analysis: no train set, just leave-one-out
             if MS:  # using the multi subject dataset
@@ -330,6 +340,7 @@ def test_pipeline(test, pipelines, session, steps_preprocess, train=None,
                 # group by subject, since we're focused on between-session not subject here
                 # We will take the "subject" (in this case S0#_S#) and treat that as our leave-out session
                 subID = subject[:3]  # grab the subject ID
+                label = subject[-3:]  # grab the session ID
                 subset = {k: v for k, v in test.items() if subID in k}  # subset to just the subject of interest
                 train_key = {k: v for k, v in subset.items() if subject not in k}  # train w/all sessions EXCEPT one (2)
                 test_key = {k: v for k, v in subset.items() if subject in k}  # test on that session (1)
@@ -353,6 +364,8 @@ def test_pipeline(test, pipelines, session, steps_preprocess, train=None,
             if SS:  # using the single subject dataset
                 print("Running a simple train/test set classification with each SS subject"
                       " trained and tested on their own data. Running subject {}".format(subject))  # for progress tracking
+                subID = subject[:3]  # grab the subject ID
+                label = subject[-3:]  # grab the session ID
                 train_key = [subject + "_1", subject + "_2", subject + "_3", subject + "_4"]
                 test_key = [subject + "_5", subject + "_6", subject + "_7", subject + "_8",
                             subject + "_9", subject + "_10", subject + "_11", subject + "_12"]
@@ -375,8 +388,10 @@ def test_pipeline(test, pipelines, session, steps_preprocess, train=None,
 
             accuracy.append(
                 dict(
-                    subject=subject,
+                    subject=subID,
+                    sess=label,
                     classifier=classifier,
+                    condition=cond,
                     acc=score,
                     value=LIME_calc(newTrain, Y_train, newTest, channels,
                                     pipelines[classifier].predict_proba, sfreq)
@@ -391,6 +406,7 @@ def test_pipeline_DL(data, dic_data_train, steps_preprocess, dic_data_test=None,
                      between=False, within=False, MS=False, SS=False, subs=None):
     global channels
     subjects = list(data.keys())  # a list of participants to be used for analysis
+    cond = "NA"
 
     if not subs:  # if no subject's provided
         subs = subjects  # use all subjects available
@@ -404,6 +420,7 @@ def test_pipeline_DL(data, dic_data_train, steps_preprocess, dic_data_test=None,
         if MS:
             if between:
                 print("Running a leave-one-out classification, leaving out {}".format(ID))  # for progress tracking
+                cond = "B"
                 train_id = subjects.copy()  # train on all
                 test_id = train_id.pop(subject)  # except for one (leave one out)
 
@@ -422,6 +439,7 @@ def test_pipeline_DL(data, dic_data_train, steps_preprocess, dic_data_test=None,
             elif within:
                 print("Running a simple train/test set classification with each MS subject"
                       " trained and tested on their own data. Running subject {}".format(ID))   # for progress tracking
+                cond = "W"
                 key_train_valid = np.array([ID + "_1", ID + "_2"])  # grab the subject's training data
                 key_test = np.array([ID + "_3", ID + "_4", ID + "_5", ID + "_6"])  # grab the subject's test data
 
@@ -450,7 +468,9 @@ def test_pipeline_DL(data, dic_data_train, steps_preprocess, dic_data_test=None,
             accuracy.append(
                 dict(
                     subject=ID,
-                    classifier="MS_DL",
+                    sess="NA",
+                    classifier="DL",
+                    condition=cond,
                     acc=score,
                     value=LIME_calc(train_gen.x, train_gen.y, test_gen.x, channels,
                                     pipelineDL.predict, sfreq)
@@ -465,6 +485,7 @@ def test_pipeline_DL(data, dic_data_train, steps_preprocess, dic_data_test=None,
             for session in sessions:  # for each session
                 if between:
                     print("Running a leave-one-out classification grouped by subject, leaving out {0} session {1}".format(subjects[subject], session))
+                    cond = "B"
                     ID = subjects[subject] + "_" + session
                     train_key = {k: v for k, v in subset.items() if
                                  session not in k}  # train w/all sessions EXCEPT one (2)
@@ -488,6 +509,7 @@ def test_pipeline_DL(data, dic_data_train, steps_preprocess, dic_data_test=None,
                 elif within:
                     print("Running a simple train/test set classification with each SS subject_session"
                           " trained and tested on their own data. Running subject {0} session {1}".format(subjects[subject], session))
+                    cond = "W"
                     ID = subjects[subject] + "_" + session
 
                     key_train_valid = np.array([ID + "_1", ID + "_2", ID + "_3", ID + "_4"])  # grab the subject's training data
@@ -519,7 +541,9 @@ def test_pipeline_DL(data, dic_data_train, steps_preprocess, dic_data_test=None,
                 accuracy.append(
                     dict(
                         subject=subjects[subject],
-                        classifier=session,
+                        sess=session,
+                        classifier="DL",
+                        condition=cond,
                         acc=score,
                         value=LIME_calc(train_gen.x, train_gen.y, test_gen.x, channels,
                                         pipelineDL.predict, sfreq)
