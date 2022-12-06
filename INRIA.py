@@ -655,33 +655,37 @@ def load_SS(between=False, within=False):
 
     data = {}  # dictionary to hold all our data
     for sub in subjects:  # for each subject...
+        skip = False
         data[sub] = [[] for i in range(len(sessions))]  # within subject, create a list for each session
-        for sess in range(
-                len(sessions)):  # for each session... (used as an iterator due to sessions/session_folder issue)
+        for sess in range(len(sessions)):  # for each session... (used as an iterator due to sessions/session_folder issue)
             fnames = [sub + "_" + sessions[sess] + "_" + i + ".gdf" for i in
                       runNames]  # develop a list of all filenames
             sub_data = []  # empty list to hold all of a subject's loaded files
             for f in fnames:  # for each file...
                 fpath = os.path.join(path, sub, session_folders[sess], f)  # select the correct file
-                sub_data.append(mne.io.read_raw_gdf(fpath))  # load it into the list
+                try:
+                    sub_data.append(mne.io.read_raw_gdf(fpath))  # load it into the list
+                except FileNotFoundError:  # if we don't have that ALL files...
+                    print("{0}, session {1} skipped due to missing files".format(sub, sessions[sess]))
+                    skip = True  # if all GDF files are not available, skip this subject (for testing purposes only)
+            if not skip:
+                # correct channel type information (to properly label EOG and EMG channels)
+                new_types = []  # create a new channel types array
+                for i in sub_data:
+                    for j in i.ch_names:
+                        if "EOG" in j:  # mark ECOG channels
+                            new_types.append("ecog")
+                        elif "EMG" in j:  # mark EMG channels
+                            new_types.append("emg")
+                        else:  # mark the rest as regular EEG
+                            new_types.append("eeg")
+                    i.set_channel_types(dict(zip(i.ch_names, new_types)))  # apply new channel types to raw object
 
-            # correct channel type information (to properly label EOG and EMG channels)
-            new_types = []  # create a new channel types array
-            for i in sub_data:
-                for j in i.ch_names:
-                    if "EOG" in j:  # mark ECOG channels
-                        new_types.append("ecog")
-                    elif "EMG" in j:  # mark EMG channels
-                        new_types.append("emg")
-                    else:  # mark the rest as regular EEG
-                        new_types.append("eeg")
-                i.set_channel_types(dict(zip(i.ch_names, new_types)))  # apply new channel types to raw object
-
-            global sfreq
-            sfreq = sub_data[0].info["sfreq"]  # save the sampling frequency for later
-            global channels  # save the channel names for later
-            channels = [sub_data[0].info["ch_names"][i] for i in mne.pick_types(sub_data[0].info, eeg=True)]
-            data[sub][sess] = sub_data  # save sub_data list into data dictionary
+                global sfreq
+                sfreq = sub_data[0].info["sfreq"]  # save the sampling frequency for later
+                global channels  # save the channel names for later
+                channels = [sub_data[0].info["ch_names"][i] for i in mne.pick_types(sub_data[0].info, eeg=True)]
+                data[sub][sess] = sub_data  # save sub_data list into data dictionary
 
     # Current data format: data[subject][session] holds all 30 raw objects for a given subject's session
     # data[subject][session][0] = Closed eyes baseline
