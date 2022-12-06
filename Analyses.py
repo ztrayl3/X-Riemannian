@@ -9,9 +9,9 @@ from INRIA import load_SS, load_MS, test_pipeline_DL, test_pipeline, LIMEd
 
 # dictionary for all our Riemannian Geometry testing pipelines
 pipelines = {}
-#pipelines['8csp+lda'] = make_pipeline(LIMEd(DL=False),
-#                                      CSP(n_components=8),
-#                                      LDA())  # baseline comparison CSP+LDA
+pipelines['8csp+lda'] = make_pipeline(LIMEd(DL=False),
+                                      CSP(n_components=8),
+                                      LDA())  # baseline comparison CSP+LDA
 pipelines['MDM'] = make_pipeline(LIMEd(DL=False),
                                  Covariances(estimator='lwf'),
                                  MDM(metric='riemann', n_jobs=-1))  # simple Riemannian
