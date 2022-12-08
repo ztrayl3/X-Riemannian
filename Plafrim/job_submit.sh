@@ -8,11 +8,7 @@
 
 # Load modules
 module purge
-module load language/python/3.8.0
-module load compiler/cuda/11.6
-module load dnn/cudnn/11.2-v8.1.1.33
-module load compiler/gcc/11.2.0
-module load mpi/openmpi/4.1.1
+module load language/python/3.9.6
 
 echo "=====my job informations ===="
 echo "Node List: " $SLURM_NODELIST

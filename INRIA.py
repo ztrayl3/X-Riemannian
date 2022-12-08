@@ -152,7 +152,7 @@ def LIME_output(data):
                 df.append(row)
 
     out = pd.DataFrame(df, columns=colnames)
-    path = "Stats/"
+    path = "Output/"
     # mark file with a timestamp, just to ensure uniqueness in filename
     filename = path + subject + "_" + str(time.time()).replace(".", "") + ".csv"
     out.to_csv(filename)
@@ -656,7 +656,7 @@ def load_SS(between=False, within=False):
     data = {}  # dictionary to hold all our data
     for sub in subjects:  # for each subject...
         skip = False
-        data[sub] = [[] for i in range(len(sessions))]  # within subject, create a list for each session
+        first = True
         for sess in range(len(sessions)):  # for each session... (used as an iterator due to sessions/session_folder issue)
             fnames = [sub + "_" + sessions[sess] + "_" + i + ".gdf" for i in
                       runNames]  # develop a list of all filenames
@@ -669,6 +669,9 @@ def load_SS(between=False, within=False):
                     print("{0}, session {1} skipped due to missing files".format(sub, sessions[sess]))
                     skip = True  # if all GDF files are not available, skip this subject (for testing purposes only)
             if not skip:
+                if first:  # just the first time, if we aren't skipping this subject...
+                    data[sub] = [[] for i in range(len(sessions))]  # within subject, create a list for each session
+                    first = False
                 # correct channel type information (to properly label EOG and EMG channels)
                 new_types = []  # create a new channel types array
                 for i in sub_data:
