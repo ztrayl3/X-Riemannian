@@ -1,24 +1,16 @@
-#!/usr/bin/env bash
-#SBATCH -J context_HPC # name of job
-#SBATCH --nodelist=sirocco07 # Ask for sirocco nodes (if less tasks than nodes then slurm adjusts list automatically)
-#SBATCH -t 2-00:00:00
-#SBATCH --ntasks-per-node=1
-#SBATCH -o ./logs/slurm/sirocco07.out # standard output message
-#SBATCH -e ./logs/slurm/sirocco07.err # output error message
+#!/bin/bash
+#SBATCH --job-name=PythonTest         # Job name
+#SBATCH --ntasks=1                    # Run on a single CPU
+#SBATCH --mem=1gb                     # Job memory request
+#SBATCH --time=00:05:00               # Time limit hrs:min:sec
+#SBATCH --output=serial_test_%j.log   # Standard output and error log
 
 # Load modules
 module purge  # unload all modules
 module load language/python/3.9.6  # load python 3.9.6
+module load slurm/14.03.0
+
+# activate Venv
 source ~/X-Riemannian/venv/bin/activate  # activate virtual environment
 
-echo "=====my job informations ===="
-echo "Node List: " $SLURM_NODELIST
-echo "my jobID: " $SLURM_JOB_ID
-echo "Partition: " $SLURM_JOB_PARTITION
-echo "submit directory:" $SLURM_SUBMIT_DIR
-echo "submit host:" $SLURM_SUBMIT_HOST
-echo "In the directory: `pwd`"
-echo "As the user: `whoami`"
-
-# run the code!
-srun -N1 -n1 -c1 --exclusive python3 plafrim_launcher.py --path ./jobs/main_00016638510971749672960/00016638515133901285376
+python3 myscript.py  # run script
