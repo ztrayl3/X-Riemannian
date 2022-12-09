@@ -692,13 +692,15 @@ def load_SS(between=False, within=False):
             data[sub][sess] = sub_data  # save sub_data list into data dictionary
 
     # remove subjects with missing data in ANY sessions
+    bad = []
     for sub in data.keys():  # for every subject...
-        skip = False
         for sess in range(len(sessions)):  # for each session...
             if len(data[sub][sess]) < 30 and not skip:
                 print("Ignoring subject {}".format(sub))
-                del data[sub]  # remove them
-                skip = True  # now that they're deleted, skip the rest of their sessions
+                bad.append(sub)
+
+    for sub in bad:
+        del data[sub]  # remove them
 
     # Current data format: data[subject][session] holds all 30 raw objects for a given subject's session
     # data[subject][session][0] = Closed eyes baseline
