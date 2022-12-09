@@ -7,8 +7,9 @@
 #SBATCH -e ./logs/slurm/sirocco07.err # output error message
 
 # Load modules
-module purge
-module load language/python/3.9.6
+module purge  # unload all modules
+module load language/python/3.9.6  # load python 3.9.6
+source ~/X-Riemannian/venv/bin/activate  # activate virtual environment
 
 echo "=====my job informations ===="
 echo "Node List: " $SLURM_NODELIST
@@ -19,4 +20,5 @@ echo "submit host:" $SLURM_SUBMIT_HOST
 echo "In the directory: `pwd`"
 echo "As the user: `whoami`"
 
+# run the code!
 srun -N1 -n1 -c1 --exclusive python3 plafrim_launcher.py --path ./jobs/main_00016638510971749672960/00016638515133901285376

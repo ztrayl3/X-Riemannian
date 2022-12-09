@@ -736,6 +736,7 @@ def load_SS(between=False, within=False):
         dic_data_test = {}
         for sub in data.keys():  # for every subject...
             for sess in range(len(sessions)):  # for each session...
+                print("Converting subject {0} session {1}".format(sub, sess))
                 for i in range(1, 5):  # place their training sessions (4) into one dictionary
                     session = sub + "_" + sessions[sess] + "_" + str(i)
                     dic_data_train[session] = data[sub][sess][i + 7]
