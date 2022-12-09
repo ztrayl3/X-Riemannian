@@ -685,12 +685,14 @@ def load_SS(between=False, within=False):
             channels = [sub_data[0].info["ch_names"][i] for i in mne.pick_types(sub_data[0].info, eeg=True)]
             data[sub][sess] = sub_data  # save sub_data list into data dictionary
 
-            # remove subjects with missing data in ANY sessions
-            for sub in data.keys():  # for every subject...
-                for sess in range(len(sessions)):  # for each session...
-                    if len(data[sub][sess]) < 30:
-                        print("Ignoring subject {}".format(sub))
-                        del data[sub]  # remove them
+    # remove subjects with missing data in ANY sessions
+    for sub in data.keys():  # for every subject...
+        skip = False
+        for sess in range(len(sessions)):  # for each session...
+            if len(data[sub][sess]) < 30 and not skip:
+                print("Ignoring subject {}".format(sub))
+                del data[sub]  # remove them
+                skip = True  # now that they're deleted, skip the rest of their sessions
 
     # Current data format: data[subject][session] holds all 30 raw objects for a given subject's session
     # data[subject][session][0] = Closed eyes baseline
@@ -738,7 +740,6 @@ def load_SS(between=False, within=False):
         dic_data_test = {}
         for sub in data.keys():  # for every subject...
             for sess in range(len(sessions)):  # for each session...
-                print("Converting subject {0} session {1}".format(sub, sess))
                 for i in range(1, 5):  # place their training sessions (4) into one dictionary
                     session = sub + "_" + sessions[sess] + "_" + str(i)
                     dic_data_train[session] = data[sub][sess][i + 7]
