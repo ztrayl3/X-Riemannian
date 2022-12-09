@@ -699,9 +699,7 @@ def load_SS(between=False, within=False):
                 print("Ignoring subject {}".format(sub))
                 bad.append(sub)
 
-    print(data.keys())
-    print(bad)
-    for sub in bad:
+    for sub in list(set(bad)):  # for every bad subject, ignoring duplicates...
         del data[sub]  # remove them
 
     # Current data format: data[subject][session] holds all 30 raw objects for a given subject's session
