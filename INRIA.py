@@ -679,10 +679,16 @@ def load_SS(between=False, within=False):
                         new_types.append("eeg")
                 i.set_channel_types(dict(zip(i.ch_names, new_types)))  # apply new channel types to raw object
 
-            global sfreq
-            sfreq = sub_data[0].info["sfreq"]  # save the sampling frequency for later
+            global sfreq  # save the sampling frequency for later
             global channels  # save the channel names for later
-            channels = [sub_data[0].info["ch_names"][i] for i in mne.pick_types(sub_data[0].info, eeg=True)]
+            try:
+                sfreq = sub_data[0].info["sfreq"]
+            except IndexError:  # if we get an index error, just try again for the next subject, they're all the same
+                pass
+            try:
+                channels = [sub_data[0].info["ch_names"][i] for i in mne.pick_types(sub_data[0].info, eeg=True)]
+            except IndexError:
+                pass
             data[sub][sess] = sub_data  # save sub_data list into data dictionary
 
     # remove subjects with missing data in ANY sessions
