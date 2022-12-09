@@ -666,7 +666,7 @@ def load_SS(between=False, within=False):
                 try:
                     sub_data.append(mne.io.read_raw_gdf(fpath))  # load it into the list
                 except FileNotFoundError:  # if we don't have that ALL files...
-                    print("{0}, session {1} missing files".format(sub, sessions[sess]))
+                    pass  # we will handle incomplete subjects later
             # correct channel type information (to properly label EOG and EMG channels)
             new_types = []  # create a new channel types array
             for i in sub_data:
