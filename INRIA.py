@@ -695,10 +695,11 @@ def load_SS(between=False, within=False):
     bad = []
     for sub in data.keys():  # for every subject...
         for sess in range(len(sessions)):  # for each session...
-            if len(data[sub][sess]) < 30 and not skip:
+            if len(data[sub][sess]) < 30:
                 print("Ignoring subject {}".format(sub))
                 bad.append(sub)
 
+    print(data.keys())
     for sub in bad:
         del data[sub]  # remove them
 
