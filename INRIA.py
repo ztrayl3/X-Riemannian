@@ -700,6 +700,7 @@ def load_SS(between=False, within=False):
                 bad.append(sub)
 
     print(data.keys())
+    print(bad)
     for sub in bad:
         del data[sub]  # remove them
 
