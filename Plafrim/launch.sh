@@ -12,4 +12,5 @@ module load language/python/3.9.6  # load python 3.9.6
 # activate Venv
 source /beegfs/ztraylor/X-Riemannian/venv/bin/activate  # activate virtual environment
 
+# first argument is subject ID second is analysis name
 python3 Analyses.py -s "$1" -a "$2"  # run script

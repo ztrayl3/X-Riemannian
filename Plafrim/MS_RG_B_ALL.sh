@@ -1,19 +1,19 @@
 #!/bin/bash
 
+# Run all MS subjects through a given condition
+cond="MS_RG_Between"
+
 for i in {1..60}
 do
-  echo A"$i"
-  #./launch.sh A"$i"
+  ./launch.sh A"$i" $cond
 done
 
 for i in {61..81}
 do
-  echo B"$i"
-  #./launch.sh A"$i"
+  ./launch.sh A"$i" $cond
 done
 
 for i in {81..87}
 do
-  echo C"$i"
-  #./launch.sh A"$i"
+  ./launch.sh A"$i" $cond
 done
