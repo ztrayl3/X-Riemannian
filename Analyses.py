@@ -1,3 +1,4 @@
+import sys, getopt
 from mne.decoding import CSP
 from pyriemann.classification import MDM
 from sklearn.pipeline import make_pipeline
@@ -182,3 +183,42 @@ def SS_RG_Within(subs):
                         "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
                         "tmin": 0.5, "tmax": 4, "overlap": 1 / 16, "length": 1}
     test_pipeline(dic_data_test, pipelines, target, steps_preprocess, dic_data_train, within=True, SS=True, subs=subs)
+
+
+def main(argv):
+    # parse subject and analysis from arguments
+    chosen_subject = ''
+    analysis = ''
+    opts, args = getopt.getopt(argv, "hs:a:", ["subjects=", "analysis="])
+    for opt, arg in opts:
+        if opt == '-h':
+            print('Analyses.py -s <subject number> -a <analysis name>')
+            sys.exit()
+        elif opt in ("-s", "--subjects"):
+            chosen_subject = arg
+        elif opt in ("-a", "--analysis"):
+            analysis = arg
+    print('Chosen subjects: ', chosen_subject)
+    print('Chosen analysis: ', analysis)
+
+    # run the chosen analysis
+    if analysis == "MS_DL_Between":
+        MS_DL_Between([chosen_subject])
+    elif analysis == "MS_DL_Within":
+        MS_DL_Within([chosen_subject])
+    elif analysis == "MS_RG_Between":
+        MS_RG_Between([chosen_subject])
+    elif analysis == "MS_RG_Within":
+        MS_RG_Within([chosen_subject])
+    elif analysis == "SS_DL_Between":
+        SS_DL_Between([chosen_subject])
+    elif analysis == "SS_DL_Within":
+        SS_DL_Within([chosen_subject])
+    elif analysis == "SS_RG_Between":
+        SS_RG_Between([chosen_subject])
+    elif analysis == "SS_RG_Within":
+        SS_RG_Within([chosen_subject])
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
