@@ -88,8 +88,7 @@ def LIME_calc(Xtrain, Ytrain, Xtest, labels, predictor, sfreq):
 
     first = True
     LIMEans = dict(Left={}, Right={})  # dictionary for predictions of both possible classes
-    # for instance in tqdm(range(len(Xtest))):  # for each epoch...
-    for instance in tqdm(range(50)):  # for DEBUGGING
+    for instance in tqdm(range(len(Xtest))):  # for each epoch...
         for i in range(0, 2):  # explain for one class at a time
             sample = Xtest[instance]
             exp = explainer.explain_instance(sample, predictor,
