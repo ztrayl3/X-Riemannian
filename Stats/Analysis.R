@@ -2,24 +2,27 @@ library(readr)
 library(ggplot2)
 library(plotly)
 
-source <- read_csv("A18_MDM.csv", col_types = cols(...1 = col_skip()))
+source <- read_csv("A18_1671123794633043.csv", col_types = cols(...1 = col_skip()))
 
 # Look at timeseries importance
-Timewise <- aggregate(source[, 5], list(source$Time), sum)
+Timewise <- data.frame(time=source$Time, weight=source$Weight)
+Timewise <- aggregate(weight~time, data=Timewise, FUN=sum)
 ggplotly(
-  ggplot(Timewise, aes(x=Group.1, y=Weight)) +
+  ggplot(Timewise, aes(x=time, y=weight)) +
     geom_area(fill="#69b3a2", alpha=0.5) +
     geom_line(color="#69b3a2") +
     ylab("Feature Weight (LIME)") +
-    xlab("Time (in EEG samples)")
+    xlab("Time (in EEG samples)") + 
+    geom_smooth(method = "lm", formula = y ~ poly(x, 15), se = FALSE)
 )
 
 # Look at channel importance
-Channelwise <- aggregate(source[, 5], list(source$Channel), sum)
-Channelwise <- Channelwise[order(Channelwise$Group.1, decreasing = TRUE),]
+Channelwise <- data.frame(channel=source$Channel, weight=source$Weight)
+Channelwise <- aggregate(weight~channel, data=Channelwise, FUN=sum)
+Channelwise <- Channelwise[order(Channelwise$channel, decreasing = TRUE),]
 
 ggplotly(
-  ggplot(data=Channelwise, aes(x=reorder(Group.1, -Weight), y=Weight)) +
+  ggplot(data=Channelwise, aes(x=reorder(channel, -weight), y=weight)) +
     geom_bar(stat="identity") + 
     xlab("Channel")
 )

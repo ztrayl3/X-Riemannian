@@ -663,8 +663,10 @@ def load_SS(between=False, within=False):
             for f in fnames:  # for each file...
                 fpath = os.path.join(path, sub, session_folders[sess], f)  # select the correct file
                 try:
+                    print("Loading file ", fpath)
                     sub_data.append(mne.io.read_raw_gdf(fpath))  # load it into the list
                 except FileNotFoundError:  # if we don't have that ALL files...
+                    print("Failed, skipping...")
                     pass  # we will handle incomplete subjects later
             # correct channel type information (to properly label EOG and EMG channels)
             new_types = []  # create a new channel types array
