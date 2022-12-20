@@ -195,7 +195,6 @@ def create_key_SS(df, train=1, test=1):  # Create an array of keys to indicate t
 
 
 def preprocess(raw, steps={}):
-    print("Preprocessing raw data...")  # for progress tracking
     """ preprocess the data"""
     assert isinstance(steps, dict), "steps must be a dictionary"
     raw.load_data()
@@ -237,7 +236,7 @@ def epoching(dict, key_session=[], steps_preprocess=None, key_events={"769": 0, 
 
         i = 0
 
-        for key in key_session:
+        for key in tqdm(key_session):
             if steps_preprocess is not None:
                 _ = preprocess(dict[key], steps_preprocess)  # preprocess data
 
@@ -269,7 +268,7 @@ def epoching(dict, key_session=[], steps_preprocess=None, key_events={"769": 0, 
         X = None
         Y = None
 
-        for key in key_session:
+        for key in tqdm(key_session):
             if steps_preprocess is not None:
                 _ = preprocess(dict[key], steps_preprocess)
 
