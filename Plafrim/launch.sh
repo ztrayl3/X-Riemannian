@@ -2,7 +2,7 @@
 #SBATCH --job-name=X_Riemann                                       # Job name
 #SBATCH --ntasks=1                                                 # Run on a single CPU
 #SBATCH --mem=32gb                                                 # Job memory request
-#SBATCH --time=06:00:00                                            # Time limit hrs:min:sec
+#SBATCH --time=10:00:00                                            # Time limit hrs:min:sec
 #SBATCH --output=/beegfs/ztraylor/X-Riemannian/Output/log_%j.log   # Standard output and error log
 
 # Load modules
