@@ -310,11 +310,9 @@ def test_pipeline(test, pipelines, session, steps_preprocess, train=None,
                   between=False, within=False, MS=False, SS=False, subs=None):
     """ Take in input the different pipelines to test and return the corresponding classification accuracy"""
 
-    if not subs:  # if no subject's provided
-        subs = session  # use all subjects available
-
     for subject in session:  # this will be something like "A10" for MS and "S06_S1" for SS
         if subject not in subs:  # skip this loop if it's not one of the subjects we want
+            print("Not the chosen subject, skipping...")
             continue
 
         # variables for eventual output
