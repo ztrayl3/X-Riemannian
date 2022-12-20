@@ -36,11 +36,12 @@ sessions = ["S1", "S2", "S3"]
 
 def MS_DL_Between(subs):
     data, dic_data = load_MS(between=True)  # load multi-subject dataset for between subject analysis
+    print("All available data loaded")
 
     steps_preprocess = {"filter": [8, 30],  # filter from 8-30Hz
                         "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
                         "tmin": 0.5, "tmax": 2.5, "overlap": 1, "length": 2}
-
+    print("Commencing pipeline tests")
     test_pipeline_DL(data, dic_data, steps_preprocess, MS=True, between=True, subs=subs)
 
 
@@ -53,11 +54,12 @@ def MS_DL_Between(subs):
 
 def MS_DL_Within(subs):
     data, dic_data_train, dic_data_test = load_MS(within=True)  # load multi-subject dataset for within subject analysis
+    print("All available data loaded")
 
     steps_preprocess = {"filter": [8, 30],  # filter from 8-30Hz
                         "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
                         "tmin": 0.5, "tmax": 2.5, "overlap": 1, "length": 2}
-
+    print("Commencing pipeline tests")
     test_pipeline_DL(data, dic_data_train, steps_preprocess, dic_data_test=dic_data_test, MS=True, within=True, subs=subs)
 
 #############################################################
@@ -93,12 +95,14 @@ def MS_RG_Between(subs):
 def MS_RG_Within(subs):
     # load the MS dataset
     data, dic_data_train, dic_data_test = load_MS(within=True)
+    print("All available data loaded")
 
     # run the selected pipelines
     session = list(data.keys())  # a list of participants to be used for analysis
     steps_preprocess = {"filter": [8, 30],  # filter from 8-30Hz
                         "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
                         "tmin": 0.5, "tmax": 4, "overlap": 1/16, "length": 1}
+    print("Commencing pipeline tests")
     test_pipeline(dic_data_test, pipelines, session, steps_preprocess, dic_data_train, within=True, MS=True, subs=subs)
 
 
@@ -115,11 +119,12 @@ def MS_RG_Within(subs):
 
 def SS_DL_Between(subs):
     data, dic_data = load_SS(between=True)  # load multi-subject dataset for between subject analysis
+    print("All available data loaded")
 
     steps_preprocess = {"filter": [8, 30],  # filter from 8-30Hz
                         "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
                         "tmin": 0.5, "tmax": 2.5, "overlap": 1, "length": 2}
-
+    print("Commencing pipeline tests")
     test_pipeline_DL(data, dic_data, steps_preprocess, SS=True, between=True, subs=subs)
 
 
@@ -133,11 +138,12 @@ def SS_DL_Between(subs):
 
 def SS_DL_Within(subs):
     data, dic_data_train, dic_data_test = load_SS(within=True)  # load single-subject dataset for within subject analysis
+    print("All available data loaded")
 
     steps_preprocess = {"filter": [8, 30],  # filter from 8-30Hz
                         "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
                         "tmin": 0.5, "tmax": 2.5, "overlap": 1, "length": 2}
-
+    print("Commencing pipeline tests")
     test_pipeline_DL(data, dic_data_train, steps_preprocess, dic_data_test=dic_data_test, SS=True, within=True, subs=subs)
 
 
@@ -152,6 +158,7 @@ def SS_DL_Within(subs):
 def SS_RG_Between(subs):
     # load the SS dataset
     data, dic_data = load_SS(between=True)
+    print("All available data loaded")
     subjects = list(data.keys())  # a list of participants to be used for analysis
     target = []
     for sub in subjects:
@@ -161,6 +168,7 @@ def SS_RG_Between(subs):
     steps_preprocess = {"filter": [8, 30],  # filter from 8-30Hz
                         "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
                         "tmin": 0.5, "tmax": 4, "overlap": 1 / 16, "length": 1}
+    print("Commencing pipeline tests")
     test_pipeline(dic_data, pipelines, target, steps_preprocess, between=True, SS=True, subs=subs)
 
 
@@ -175,6 +183,7 @@ def SS_RG_Between(subs):
 def SS_RG_Within(subs):
     # load the SS dataset
     data, dic_data_train, dic_data_test = load_SS(within=True)
+    print("All available data loaded")
     subjects = list(data.keys())  # a list of participants to be used for analysis
     target = []
     for sub in subjects:
@@ -184,6 +193,7 @@ def SS_RG_Within(subs):
     steps_preprocess = {"filter": [8, 30],  # filter from 8-30Hz
                         "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
                         "tmin": 0.5, "tmax": 4, "overlap": 1 / 16, "length": 1}
+    print("Commencing pipeline tests")
     test_pipeline(dic_data_test, pipelines, target, steps_preprocess, dic_data_train, within=True, SS=True, subs=subs)
 
 

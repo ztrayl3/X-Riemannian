@@ -312,7 +312,7 @@ def test_pipeline(test, pipelines, session, steps_preprocess, train=None,
 
     for subject in session:  # this will be something like "A10" for MS and "S06_S1" for SS
         if subject not in subs:  # skip this loop if it's not one of the subjects we want
-            print("Not the chosen subject, skipping...")
+            print(subject, " is not the chosen subject, skipping...")
             continue
 
         # variables for eventual output
