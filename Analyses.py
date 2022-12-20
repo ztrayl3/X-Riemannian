@@ -71,12 +71,14 @@ def MS_DL_Within(subs):
 def MS_RG_Between(subs):
     # load the MS dataset
     data, dic_data = load_MS(between=True)
+    print("All available data loaded")
 
     # run the selected pipelines
     session = list(data.keys())  # a list of participants to be used for analysis
     steps_preprocess = {"filter": [8, 30],  # filter from 8-30Hz
                         "drop_channels": ['EOG1', 'EOG2', 'EOG3', 'EMGg', 'EMGd'],  # ignore EOG/EMG channels
                         "tmin": 0.5, "tmax": 4, "overlap": 1/16, "length": 1}
+    print("Commencing pipeline tests")
     test_pipeline(dic_data, pipelines, session, steps_preprocess, between=True, MS=True, subs=subs)  # run it!
 
 
