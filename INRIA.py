@@ -580,8 +580,10 @@ def load_MS(between=False, within=False):
         for f in fnames:  # for each file...
             fpath = os.path.join(path, sub, f)  # select the correct file
             try:
+                print("Loading file ", fpath)
                 sub_data.append(mne.io.read_raw_gdf(fpath))  # load it into the list
             except FileNotFoundError:
+                print("Failed, skipping...")
                 skip = True  # if all GDF files are not available, skip this subject (for testing purposes only)
         if not skip:
             # correct channel type information (to properly label EOG and EMG channels)
