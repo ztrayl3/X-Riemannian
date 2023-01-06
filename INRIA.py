@@ -1,6 +1,7 @@
 import os
 import mne
 import time
+import random
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
@@ -88,7 +89,8 @@ def LIME_calc(Xtrain, Ytrain, Xtest, labels, predictor, sfreq):
 
     first = True
     LIMEans = dict(Left={}, Right={})  # dictionary for predictions of both possible classes
-    for instance in tqdm(range(len(Xtest))):  # for each epoch...
+    #for instance in tqdm(range(len(Xtest))):  # for each epoch...
+    for instance in tqdm(random.sample(range(len(Xtest)), int(len(Xtest)*.20))):  # for 20% of epochs, randomly
         for i in range(0, 2):  # explain for one class at a time
             sample = Xtest[instance]
             exp = explainer.explain_instance(sample, predictor,
