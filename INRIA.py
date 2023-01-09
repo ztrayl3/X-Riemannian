@@ -208,7 +208,7 @@ def preprocess(raw, steps={}):
 
     if "filter" in steps.keys():
         assert isinstance(steps["filter"], list), "filter parameters must be a list in the form [l_freq,h_freq]"
-        raw.filter(steps["filter"][0], steps["filter"][1])
+        raw.filter(steps["filter"][0], steps["filter"][1], n_jobs=2)
 
     return raw
 
