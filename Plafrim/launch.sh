@@ -8,6 +8,8 @@
 # Load modules
 module purge  # unload all modules
 module load language/python/3.9.6  # load python 3.9.6
+module load compiler/cuda/11.6  # load cuda for DL
+module load dnn/cudnn/9.0-v7.1  # load cuDNN
 
 # activate Venv
 cd /beegfs/ztraylor/X-Riemannian
