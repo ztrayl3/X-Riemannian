@@ -3,8 +3,7 @@
 #SBATCH --ntasks=1                                                 # Run on a single CPU
 #SBATCH --mem=32gb                                                 # Job memory request
 #SBATCH --time=10:00:00                                            # Time limit hrs:min:sec
-#SBATCH --output=/beegfs/ztraylor/X-Riemannian/Output/log_%j.log   # Standard output and error log
-#SBATCH --nodelist=zonda[02-21]                                    # Try and distribute across nodes
+#SBATCH --output=/beegfs/ztraylor/X-Riemannian/Output/%j.log       # Standard output and error log
 
 # Load modules
 module purge  # unload all modules
