@@ -50,7 +50,7 @@ class LIMEdl():
         self.batch_size = 32
         self.n_epochs = 500
         self.modelname = str(random.randrange(1000000))  # salt the filename for the model weights
-        self.callbacks = [EarlyStopping(patience=15, monitor="loss"),
+        self.callbacks = [EarlyStopping(patience=50, monitor="loss"),
                           ModelCheckpoint(filepath='Model/' + self.modelname + '_best.h5', save_best_only=True)]
         self.valid_gen = valid_gen
 
