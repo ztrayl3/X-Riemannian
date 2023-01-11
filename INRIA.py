@@ -1,7 +1,7 @@
 import os
 import mne
 import time
-import random
+import uuid
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
@@ -49,7 +49,7 @@ class LIMEdl():
         self.model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=BinaryAccuracy())
         self.batch_size = 32
         self.n_epochs = 500
-        self.modelname = str(random.randrange(1000000))  # salt the filename for the model weights
+        self.modelname = str(uuid.uuid4())  # salt the filename for the model weights
         self.callbacks = [EarlyStopping(patience=50, monitor="loss"),
                           ModelCheckpoint(filepath='Model/' + self.modelname + '_best.h5', save_best_only=True)]
         self.valid_gen = valid_gen
