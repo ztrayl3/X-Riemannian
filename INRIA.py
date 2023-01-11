@@ -2,6 +2,7 @@ import os
 import mne
 import time
 import uuid
+import random
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
@@ -51,7 +52,7 @@ class LIMEdl():
         self.n_epochs = 500
         self.modelname = str(uuid.uuid4())  # salt the filename for the model weights
         self.callbacks = [EarlyStopping(patience=50, monitor="loss"),
-                          ModelCheckpoint(filepath='Model/' + self.modelname + '_best.h5', save_best_only=True)]
+                          ModelCheckpoint(filepath='Model/' + self.modelname + '.h5', save_best_only=True)]
         self.valid_gen = valid_gen
 
     def fit(self, X, y=None, **fit_params):
@@ -65,11 +66,11 @@ class LIMEdl():
         return self.model
 
     def predict(self, X):
-        self.model = load_model('Model/' + self.modelname + '_best.h5', custom_objects={"square": square, "log": log})
+        self.model = load_model('Model/' + self.modelname + '.h5', custom_objects={"square": square, "log": log})
         return self.model.predict(x=X)
 
     def score(self, X, y=None, sample_weight=None):
-        self.model = load_model('Model/' + self.modelname + '_best.h5', custom_objects={"square": square, "log": log})
+        self.model = load_model('Model/' + self.modelname + '.h5', custom_objects={"square": square, "log": log})
         return self.model.evaluate(x=X, y=y)[1]
 
 
