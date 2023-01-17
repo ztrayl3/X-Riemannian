@@ -3,7 +3,7 @@
 #SBATCH --ntasks=1                                                 # Run on a single CPU
 #SBATCH --mem=32gb                                                 # Job memory request
 #SBATCH --time=24:00:00                                            # Time limit hrs:min:sec
-#SBATCH --output=/beegfs/ztraylor/X-Riemannian/Output/$1%j.log       # Standard output and error log
+#SBATCH --output=/beegfs/ztraylor/X-Riemannian/Output/%j.log       # Standard output and error log
 
 # Load modules
 module purge  # unload all modules

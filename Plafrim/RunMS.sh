@@ -3,7 +3,7 @@
 # Run all MS subjects through a given condition
 # Note: we ignore subjects A04, A09, A17, A29, A41, B78, and B79 due to being listed as "bad" in the original paper
 cond="MS_RG_Between"  # chosen condition
-target="diabolo"  # chosen HPC node, note that DL conditions need GPU nodes!
+target="diablo"  # chosen HPC node, note that DL conditions need GPU nodes!
 N=6  # how many nodes target has
 m=6  # minimum node number, for smaller windows
 
