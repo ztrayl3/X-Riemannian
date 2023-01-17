@@ -13,16 +13,7 @@ p <- "csv/MS_DL_B/"
 file_names <- paste(p, dir(p), sep = '')  # list all csv files
 source <- do.call(rbind, lapply(file_names, read_csv, col_types = cols(...1 = col_skip())))  # load them into one DF
 
-# Structure:
-#   +-----------------+------------------------------+------------------------------+
-#   |        .        |          Left Hand           |          Right Hand          |
-#   +-----------------+------------------------------+------------------------------+
-#   | 8csp+lda        | Channel/Timepoint Importance | Channel/Timepoint Importance |
-#   | MDM             | Channel/Timepoint Importance | Channel/Timepoint Importance |
-#   | tangentspace+LR | Channel/Timepoint Importance | Channel/Timepoint Importance |
-#   +-----------------+------------------------------+------------------------------+
-
-# Collect channel importance by condition (see above structure)
+# Collect channel importance by condition
 p <- list()  # for capturing plots
 i <- 1
 for (hand in names(table(source$Predicted))) {
@@ -40,7 +31,3 @@ for (hand in names(table(source$Predicted))) {
 }
 
 do.call(grid.arrange, c(p, ncol=1, top = "Channel Importance (normalized), separated by predicted class (top = left, bottom = right)"))
-
-# Plot classifier accuracy (per subject)
-ggplot(source, aes(y=Accuracy, x=Subject)) + 
-        geom_bar(position="dodge", stat="identity")

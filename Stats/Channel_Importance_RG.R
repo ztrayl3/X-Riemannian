@@ -45,7 +45,3 @@ for (hand in names(table(source$Predicted))) {
   }
 }
 do.call(grid.arrange, c(p, ncol=3, top = "Channel Importance (normalized), separated by predicted class (top = left, bottom = right)"))
-
-# Plot classifier accuracy (per subject)
-ggplot(source, aes(fill=Classifier, y=Accuracy, x=Subject)) + 
-        geom_bar(position="dodge", stat="identity")
