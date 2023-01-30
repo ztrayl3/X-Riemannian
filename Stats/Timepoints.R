@@ -1,0 +1,82 @@
+library(readr)
+library(ggplot2)
+library(eegUtils)
+library(gridExtra)
+
+adjust = FALSE
+LIME_load <- function(p) {
+  file_names <- paste(p, dir(p), sep = '')  # list all csv files
+  # return one big DF of all csvs from the path
+  return(do.call(rbind, lapply(file_names, read_csv, col_types = cols(...1 = col_skip()))))
+}
+
+# Load all available LIME files
+MS_RG_Within <- LIME_load("csv/MS_RG_W/")
+MS_DL_Within <- LIME_load("csv/MS_DL_W/")
+MS_Within <- rbind(MS_RG_Within, MS_DL_Within)
+
+#MS_RG_Between <- LIME_load("csv/MS_RG_B/")
+#MS_DL_Between <- LIME_load("csv/MS_DL_B/")
+#MS_Between <- rbind(MS_RG_Between, MS_DL_Between)
+
+#SS_RG_Within <- LIME_load("csv/SS_RG_W/")
+#SS_DL_Within <- LIME_load("csv/SS_DL_W/")
+#SS_Within <- rbind(SS_RG_Within, SS_DL_Within)
+
+#SS_RG_Between <- LIME_load("csv/SS_RG_B/")
+#SS_DL_Between <- LIME_load("csv/SS_DL_B/")
+#SS_Between <- rbind(SS_RG_Between, SS_DL_Between)
+
+source <- MS_Within  # choose your condition!
+
+# Structure:
+#   +-----------------+------------------------------+------------------------------+
+#   | Classifier      |          Left Hand           |          Right Hand          |
+#   +-----------------+------------------------------+------------------------------+
+#   | 8csp+lda        | Channel/Timepoint Importance | Channel/Timepoint Importance |
+#   | MDM             | Channel/Timepoint Importance | Channel/Timepoint Importance |
+#   | tangentspace+LR | Channel/Timepoint Importance | Channel/Timepoint Importance |
+#   | ShallowConvNet  | Channel/Timepoint Importance | Channel/Timepoint Importance |
+#   +-----------------+------------------------------+------------------------------+
+
+# Collect timepoint importance by condition (see above structure)
+p <- list()  # for capturing plots
+i <- 1
+for (hand in names(table(source$Predicted))) {
+  for (classifier in names(table(source$Classifier))) {
+    # Print selected combo
+    t <- paste(classifier, hand, sep = " ")
+    print(t)
+    
+    # Extract data
+    temp <- subset(source, source$Predicted==hand & source$Classifier==classifier)  # select one hand - classifier combo
+    temp.times <- aggregate(Weight ~ Subject + Accuracy + Time, data = temp, sum)  # sum timepoint importances across all channels
+    accs <- data.frame(Subject=temp.times$Subject,
+                       Accuracy=temp.times$Accuracy)  # make equal sized DF of just accuracy values
+    temp.times <- aggregate(Weight ~ Time, data = temp, sum)  # limit data to ONLY times and weights
+    temp.times$Weight <- scale(temp.times$Weight)  # normalize (mean 0, SD 1)
+    
+    if (adjust) {
+      # adjust feature weights based on classifier accuracy
+      for (row in 1:nrow(temp.times)) {
+        if (accs[row, ]$Accuracy < 0.65) {
+          temp.times[row, ]$Weight <- temp.times[row, ]$Weight * 10
+        } else {
+          temp.times[row, ]$Weight <- temp.times[row, ]$Weight / 10
+        }
+      }
+    }
+    
+    if (grepl("DL", t, fixed = TRUE)) {  # for the DL classifier only
+      temp.times <- subset(temp.times, temp.times$Time<513)
+    }
+    
+    # Plot topographical feature importance (across ALL subjects)
+    p[[i]] <- ggplot(temp.times, aes(x=Time, y=Weight)) +
+                     geom_area( fill="#5999c7", alpha=0.4) +
+                     geom_line(color="#000000", linewidth=0.5) +
+                     ggtitle(t)
+    i <- i + 1
+  }
+}
+do.call(grid.arrange, c(p, ncol=4, top = "Timepoint Importance (normalized), separated by predicted class (top = left, bottom = right)"))
